@@ -99,16 +99,14 @@ class Telebot {
         /** @var BotApi|Client $bot */
         $bot = new Basic($db->get('config.api'));
         $this->telegram = $bot;
-
-        $this->start($bot);
     }
 
     /**
      * Starts the bot
-     * @param $bot
      */
-    public function start($bot)
+    public function start()
     {
+        $bot = $this->telegram;
         while (!System_Daemon::isDying() && $this->run) {
             try {
                 $start = microtime(true);
