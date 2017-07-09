@@ -1,6 +1,13 @@
 {
     "name": "prowebcraft/telebot",
     "description": "Telegram bot with dialogs and session management",
+    "keywords": [
+        "php",
+        "telegram",
+        "bot",
+        "bot api"
+    ],
+    "license": "MIT",
     "authors": [
         {
             "name": "Andrey Mistulov",

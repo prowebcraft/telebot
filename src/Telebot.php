@@ -48,12 +48,6 @@ class Telebot {
     public $count = 1;
     public $stepDelay = 3;
 
-
-
-    const BROADCAST_ALL = 'all';
-    const BROADCAST_GROUPS = 'groups';
-    const BROADCAST_USERS = 'users';
-
     public function __construct($appName, $description, $author, $email, $options = [])
     {
         if ($this->getRunArg('help')) {
