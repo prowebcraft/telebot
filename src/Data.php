@@ -18,9 +18,12 @@ class Data extends Dot
 {
     protected $db = '';
     protected $data = null;
+    protected $dir = null;
 
-    public function __construct()
+    public function __construct($dir = null)
     {
+        if ($dir === null) $dir = getcwd();
+        $this->dir = $dir;
         $this->loadData();
         parent::__construct();
     }
@@ -132,10 +135,11 @@ class Data extends Dot
      */
     protected function loadData($reload = false) {
         if ($this->data === null || $reload) {
-            $this->db = realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR . 'data.json';
+            $this->db = $this->dir . DIRECTORY_SEPARATOR . 'data.json';
             if (!file_exists($this->db)) {
-                if (file_exists('template.'.$this->db)) {
-                    copy('template.'. $this->db, $this->db);
+                $templateFile = realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.' . $this->db;
+                if (file_exists($templateFile)) {
+                    copy($templateFile, $this->db);
                 } else {
                     touch($this->db);
                 }

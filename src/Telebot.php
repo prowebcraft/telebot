@@ -74,6 +74,7 @@ class Telebot {
             'sysMemoryLimit' => '1024M',
             'logLocation' => realpath(__DIR__ . '/..') . '/runtime/bot.log'
         , $options));
+        unset($options[0]);
         System_Daemon::setOptions($options);
 
         if ($this->getRunArg('write-initd')) {
