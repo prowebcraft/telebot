@@ -16,8 +16,8 @@
     ],
     "type": "package",
     "autoload": {
-        "psr-0" : {
-            "Prowebcraft\\Telebot" : "src"
+        "psr-4" : {
+            "Prowebcraft\\Telebot\\" : "src"
         }
     },
     "minimum-stability": "dev",
