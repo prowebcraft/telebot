@@ -20,7 +20,7 @@
             "Prowebcraft\\Telebot" : "src"
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "require": {
         "adbario/php-dot-notation": "1.2.0",
         "telegram-bot/api": "2.2.10",
