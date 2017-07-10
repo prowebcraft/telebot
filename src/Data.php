@@ -8,13 +8,12 @@
  */
 
 namespace Prowebcraft\Telebot;
-use AdBar\Dot; //https://github.com/adbario/php-dot-notation
 
 /**
  * Class Data
  * @package Aristos
  */
-class Data extends Dot
+class Data extends \Prowebcraft\Dot
 {
     protected $db = '';
     protected $data = null;
@@ -38,24 +37,7 @@ class Data extends Dot
      */
     public function set($key, $value = null, $save = true)
     {
-        if (is_string($key)) {
-            // Iterate path
-            $keys = explode('.', $key);
-            $data = &$this->data;
-            foreach ($keys as $key) {
-                if (!isset($data[$key]) || !is_array($data[$key])) {
-                    $data[$key] = [];
-                }
-                $data = &$data[$key];
-            }
-            // Set value to path
-            $data = $value;
-        } elseif (is_array($key)) {
-            // Iterate array of paths and values
-            foreach ($key as $k => $v) {
-                $this->set($k, $v);
-            }
-        }
+        parent::set($key, $value);
         if ($save) $this->save();
         return $this;
     }
@@ -137,7 +119,7 @@ class Data extends Dot
         if ($this->data === null || $reload) {
             $this->db = $this->dir . DIRECTORY_SEPARATOR . 'data.json';
             if (!file_exists($this->db)) {
-                $templateFile = realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.' . $this->db;
+                $templateFile = realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json';
                 if (file_exists($templateFile)) {
                     copy($templateFile, $this->db);
                 } else {

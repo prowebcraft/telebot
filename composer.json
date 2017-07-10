@@ -22,7 +22,7 @@
     },
     "minimum-stability": "dev",
     "require": {
-        "adbario/php-dot-notation": "1.2.0",
+        "prowebcraft/dot": "dev-master",
         "telegram-bot/api": "2.2.10",
         "pear/system_daemon": "dev-master"
     }
