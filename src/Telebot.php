@@ -11,7 +11,9 @@ use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
 use TelegramBot\Api\Types\ForceReply;
+use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
 use TelegramBot\Api\Types\Message;
+use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
 use TelegramBot\Api\Types\Update;
 
@@ -450,7 +452,7 @@ class Telebot
      * Reply to user or chat
      * @param $text
      * @param Event|int $e
-     * @param null|ReplyKeyboardMarkup|ForceReply $markup
+     * @param null|ReplyKeyboardMarkup|ForceReply|InlineKeyboardMarkup $markup
      * @return Message|false
      */
     public function reply($text, $e = null, $markup = null)
@@ -465,6 +467,16 @@ class Telebot
             return false;
         }
         return $this->telegram->sendMessage($target, $text, 'HTML', false, null, $markup);
+    }
+
+    /**
+     * Reply to user or chat and clear keyboard
+     * @param $text
+     * @return false|Message
+     */
+    public function replyAndHide($text)
+    {
+        $this->reply($text, null, new ReplyKeyboardHide());
     }
 
     /**
@@ -574,13 +586,14 @@ class Telebot
         if (!$chatId) $chatId = $this->getChatId();
         if ($this->isGlobalAdmin()) {
             $this->addConfig('config.whiteGroups', $chatId);
-            $this->reply('Группа ' . $chatId . ' теперь доступна для игры');
+            $this->reply('Группа ' . $chatId . ' теперь доступна бота');
         }
     }
 
     /**
      * Удалить пользователя из списка доверенных
      * @param null $e
+     * @admin
      * @throws \Exception
      */
     public function untrustCommand($e = null)
