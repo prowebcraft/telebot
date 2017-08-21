@@ -43,6 +43,7 @@ class Telebot
     protected $asks = [];
     protected $asksUsers = [];
     protected $asksAnswers = [];
+    protected $inlineAnswers = [];
 
     private $lastUpdateId = null;
 
@@ -319,7 +320,11 @@ class Telebot
     public function handleUpdate($update)
     {
         $message = $update->getMessage();
-        if (is_object($message)) {
+        if ($cbq = $update->getCallbackQuery()) {
+            if ($cb = $this->inlineAnswers[$cbq->getMessage()->getMessageId()]) {
+                call_user_func($cb, $cbq);
+            }
+        } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
                 $fromName = $this->getFromName($message, true, true);
                 if ($this->isMessageAllowed($message)) {
@@ -329,10 +334,11 @@ class Telebot
                     System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s', $update->getUpdateId(), $message->getText(), $fromName);
                 }
             } else {
-                System_Daemon::warning('[%s][WARN] Message with empty body: %s', $update->getUpdateId(), var_export($message, true));
+                System_Daemon::warning('[%s][WARN] Message with empty body: %s', $update->getUpdateId(), json_encode($message, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
             }
         } else {
-            System_Daemon::err('[%s][ERROR] Skipping message with invalid type %s. Update Info: %s', $update->getUpdateId(), var_export($message, true), var_export($update, true));
+            System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s', $update->getUpdateId(),
+                json_encode($update, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
         }
     }
 
@@ -367,6 +373,8 @@ class Telebot
         $this->e = $e = new Event();
         $e->setMessage($message);
         $e->setArgs($commandParts);
+        if (method_exists($this, 'addUser'))
+            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
 
         $replyToId = null;
         $replyMatch = 'unknown';
@@ -458,14 +466,9 @@ class Telebot
     public function reply($text, $e = null, $markup = null)
     {
         System_Daemon::info('[REPLY] %s', $text);
-        if ($e === null) $e = $this->e;
-        if ($e instanceof Event) {
-            $target = $e->getUserId();
-        } elseif (is_numeric($e)) {
-            $target = $e;
-        } else {
-            return false;
-        }
+        $target = $this->getTarget($e);
+        if (!$target)
+            return;
         return $this->telegram->sendMessage($target, $text, 'HTML', false, null, $markup);
     }
 
@@ -477,6 +480,35 @@ class Telebot
     public function replyAndHide($text)
     {
         $this->reply($text, null, new ReplyKeyboardHide());
+    }
+
+    /**
+     * Update message by id
+     * @param $id
+     * @param $text
+     * @param string $parse
+     * @param bool $disablePreview
+     * @param null $markup
+     */
+    public function updateMessage($id, $text, $parse = 'html', $disablePreview = true, $markup = null)
+    {
+        $target = $this->getTarget();
+        if (!$target)
+            return;
+        $this->telegram->editMessageText($target, $id, $text, $parse, $disablePreview, $markup);
+    }
+
+    /**
+     * Update message Reply Markup
+     * @param $id
+     * @param $markup
+     */
+    public function updateMessageReplyMarkup($id, $markup)
+    {
+        $target = $this->getTarget($e);
+        if (!$target)
+            return;
+        $this->telegram->editMessageReplyMarkup($target, $id, $markup);
     }
 
     /**
@@ -523,6 +555,31 @@ class Telebot
         if ($multiple) $rm->setOneTimeKeyboard(false);
         $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
         $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple);
+        return $send;
+    }
+
+    /**
+     * Запросить уточнение путем размещения Inline кнопок под сообщением
+     * @param string $text
+     * Текст сообщения
+     * @param array $answers
+     * Варианты ответа
+     * @param callable|null $callback
+     * Имя параметра, с которым вернется
+     * @return Message
+     */
+    public function askInline($text, $answers = [], $callback = null)
+    {
+        System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) : ''));
+        $e = $this->e;
+        if (is_array($answers)) {
+            $answers = new InlineKeyboardMarkup($answers);
+        }
+        if (!($answers instanceof InlineKeyboardMarkup)) {
+            throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($answers, true));
+        }
+        $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, null, $answers);
+        $this->inlineAnswers[$send->getMessageId()] = $callback;
         return $send;
     }
 
@@ -884,6 +941,23 @@ class Telebot
         if ($username) $fromName .= ($from->getUsername() ? ' @' . $from->getUsername() : '');
         if ($id) $fromName .= ' (' . $from->getId() . ')';
         return $fromName;
+    }
+
+    /**
+     * @param $e
+     * @return bool|int|string
+     */
+    protected function getTarget($e = null)
+    {
+        if ($e === null) $e = $this->e;
+        if ($e instanceof Event) {
+            $target = $e->getUserId();
+        } elseif (is_numeric($e)) {
+            $target = $e;
+        } else {
+            return false;
+        }
+        return $target;
     }
 
 }
