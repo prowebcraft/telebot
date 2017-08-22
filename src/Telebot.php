@@ -321,8 +321,8 @@ class Telebot
     {
         $message = $update->getMessage();
         if ($cbq = $update->getCallbackQuery()) {
-            if ($cb = $this->inlineAnswers[$cbq->getMessage()->getMessageId()]) {
-                call_user_func($cb, $cbq);
+            if ($cb = @$this->inlineAnswers[$cbq->getMessage()->getMessageId()]) {
+                call_user_func($cb, new AnswerInline($cbq, $this));
             }
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
@@ -548,12 +548,12 @@ class Telebot
             $answers = $rm->getKeyboard();
         } elseif (!empty($answers) && is_array($answers)) {
             if (!empty($answers) && is_array($answers) && !is_array($answers[0])) $answers = [$answers];
-            $rm = new \TelegramBot\Api\Types\ReplyKeyboardMarkup($answers, true, true, true);
+            $rm = new ReplyKeyboardMarkup($answers, true, true, true);
         } else {
-            $rm = new \TelegramBot\Api\Types\ForceReply(true, false);
+            $rm = new ForceReply(true, false);
         }
         if ($multiple) $rm->setOneTimeKeyboard(false);
-        $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
+        $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
         $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple);
         return $send;
     }

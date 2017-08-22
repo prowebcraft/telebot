@@ -22,7 +22,7 @@ trait Names
      */
     protected function addUser($id, $name)
     {
-        if (!$this->getPlayerName($id)) {
+        if (!$this->getUserName($id)) {
             $this->setUserName($id, $name);
         }
     }
@@ -43,7 +43,7 @@ trait Names
      * @param int $id
      * @return string
      */
-    protected function getPlayerName($id, $default = null)
+    protected function getUserName($id, $default = null)
     {
         if (!isset($this->userNames[$id])) {
             $this->userNames[$id] = $this->getConfig("config.names.$id", $default);
