@@ -10,8 +10,11 @@ use System_Daemon;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
+use TelegramBot\Api\Types\CallbackQuery;
 use TelegramBot\Api\Types\ForceReply;
 use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
+use TelegramBot\Api\Types\Inline\InlineQuery;
+use TelegramBot\Api\Types\Inline\QueryResult\AbstractInlineQueryResult;
 use TelegramBot\Api\Types\Message;
 use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
@@ -38,8 +41,10 @@ class Telebot
     /** @var $telegram BotApi|Client|null */
     public $telegram = null;
     public $commandAlias = [];
-    /** @var Event $e Текущее событие */
-    protected $e = null;
+    /** @var Event $e Текущее сообщение */
+    protected $e;
+    /** @var Update $update */
+    protected $update;
     protected $asks = [];
     protected $asksUsers = [];
     protected $asksAnswers = [];
@@ -314,19 +319,41 @@ class Telebot
     }
 
     /**
+     * Handler for incoming inline queries
+     * @param InlineQuery $inlineQuery
+     * @return false|AbstractInlineQueryResult[]
+     */
+    protected function handleInlineQuery(InlineQuery $inlineQuery) {
+        System_Daemon::warning('Inline query handler not implemented');
+        return false;
+    }
+
+    /**
      * Handle Update Message
      * @param Update $update
      */
     public function handleUpdate($update)
     {
+        $this->update = $update;
         $message = $update->getMessage();
-        if ($cbq = $update->getCallbackQuery()) {
-            if ($cb = @$this->inlineAnswers[$cbq->getMessage()->getMessageId()]) {
+        $fromName = $this->getFromName($message, true, true);
+        if (method_exists($this, 'addUser'))
+            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
+        if ($inlineQuery = $update->getInlineQuery()) {
+            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $update->getUpdateId(),
+                $inlineQuery->getQuery(), $fromName);
+            if ($result = $this->handleInlineQuery($inlineQuery)) {
+                $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
+            }
+        } elseif ($cbq = $update->getCallbackQuery()) {
+            $replyForMessageId = $cbq->getMessage()->getMessageId();
+            if ($cb = @$this->inlineAnswers[$replyForMessageId]) {
+                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $update->getUpdateId(),
+                    $replyForMessageId, $cbq->getData(), $fromName);
                 call_user_func($cb, new AnswerInline($cbq, $this));
             }
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
-                $fromName = $this->getFromName($message, true, true);
                 if ($this->isMessageAllowed($message)) {
                     System_Daemon::info('[%s][OK] Received message %s from trusted user %s', $update->getUpdateId(), $message->getText(), $fromName);
                     $this->handle($update->getMessage());
@@ -355,7 +382,7 @@ class Telebot
             $this->getConfig('config.admins', []),
             $this->getConfig('config.trust', [])
         );
-        if (in_array($message->getFrom()->getId(), $trustedUsers))
+        if (in_array($this->getUserId(), $trustedUsers))
             return true;
         return false;
     }
@@ -366,15 +393,12 @@ class Telebot
      */
     public function handle($message)
     {
-
         //Regular Message
         $command = $message->getText();
         $commandParts = explode(" ", $command);
         $this->e = $e = new Event();
         $e->setMessage($message);
         $e->setArgs($commandParts);
-        if (method_exists($this, 'addUser'))
-            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
 
         $replyToId = null;
         $replyMatch = 'unknown';
@@ -386,10 +410,10 @@ class Telebot
             //Проверка на ожидание вариантов ответа
             $replyToId = $this->asksAnswers[$message->getText()];
             $replyMatch = 'By Text Answer';
-        } elseif ($message->getText()[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$message->getFrom()->getId()])) {
+        } elseif ($message->getText()[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$this->getUserId()])) {
             //Проверка на ожидание сообщения конкретного пользователя
-            $replyToId = $this->asksUsers[$message->getFrom()->getId()];
-            $replyMatch = 'By Waiting User Input';
+//            $replyToId = $this->asksUsers[$this->getUserId()];
+//            $replyMatch = 'By Waiting User Input';
         }
         if ($replyToId && isset($this->asks[$replyToId])) {
             //ReplyTo Message
@@ -401,7 +425,7 @@ class Telebot
             $callback = $replyData['callback'];
             if (!$replyData['multiple']) {
                 unset($this->asks[$replyToId]);
-                unset($this->asksUsers[$message->getFrom()->getId()]);
+                unset($this->asksUsers[$this->getUserId()]);
                 $this->asksAnswers = [];
             }
             if (is_callable($callback)) {
@@ -429,11 +453,11 @@ class Telebot
                 }
             } else {
                 foreach ($this->matches as $expression => $commandName) {
-                    if (preg_match($expression, $command)) {
+                    if (preg_match($expression, $command, $matches)) {
                         if ($this->commandExist($commandName)) {
                             System_Daemon::info('[RUN] Running %s matched by %s', $commandName, $expression);
                             try {
-                                call_user_func_array([$this, $commandName], [$e]);
+                                call_user_func_array([$this, $commandName], [$e, $matches]);
                             } catch (\Exception $ex) {
                                 $this->reply(sprintf('Ошибка выполнения команды: %s', $ex->getMessage()));
                             }
@@ -811,8 +835,10 @@ class Telebot
      */
     protected function getUserId()
     {
-        if (!$this->e) return null;
-        return $this->e->getMessage()->getFrom()->getId();
+        if (!$this->update)
+            return null;
+        $message = $this->getContext();
+        return $message->getFrom()->getId();
     }
 
     /**
@@ -831,7 +857,12 @@ class Telebot
         }
     }
 
-    private function cleanDoc($doc)
+    /**
+     * Clean up PhpDoc comments
+     * @param $doc
+     * @return string
+     */
+    protected function cleanDoc($doc)
     {
         return trim(str_replace(['/*', '*/', '*'], '', $doc));
     }
@@ -934,7 +965,9 @@ class Telebot
      */
     protected function getFromName($message = null, $username = false, $id = false)
     {
-        if (!$message) $message = $this->e->getMessage();
+        if (!$message) {
+            $message = $this->getContext();
+        }
         $from = $message->getFrom();
         $fromName = $from->getFirstName()
             . ($from->getLastName() ? ' ' . $from->getLastName() : '');
@@ -958,6 +991,23 @@ class Telebot
             return false;
         }
         return $target;
+    }
+
+    /**
+     * Get current update type Context
+     * @return BaseType|Message|InlineQuery|CallbackQuery|null
+     */
+    protected function getContext()
+    {
+        $message = null;
+        if ($this->update->getInlineQuery()) {
+            $message = $this->update->getInlineQuery();
+        } elseif ($this->update->getCallbackQuery()) {
+            $message = $this->update->getCallbackQuery();
+        } elseif ($this->update->getMessage()) {
+            $message = $this->update->getMessage();
+        }
+        return $message;
     }
 
 }
