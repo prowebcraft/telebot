@@ -15,6 +15,9 @@ class Answer
 {
 
     protected $info = null;
+    /**
+     * @var null|Message
+     */
     protected $message = null;
     protected $variant = -1;
 
@@ -25,7 +28,27 @@ class Answer
     }
 
     /**
+     * Return original ask message id
      * @return null
+     */
+    public function getAskMessageId()
+    {
+        $info = $this->getInfo();
+        return $info['id'] ?: null;
+    }
+
+    /**
+     * Get reply message plain text
+     * @return string
+     */
+    public function getReplyText()
+    {
+        return $this->getMessage()->getText();
+    }
+    
+    /**
+     * Get Payload information
+     * @return array
      */
     public function getInfo()
     {
@@ -33,7 +56,7 @@ class Answer
     }
 
     /**
-     * Информация об оригинальном сообщении и вопросе
+     * Payload information
      * @param array $info
      */
     public function setInfo($info)
@@ -42,7 +65,7 @@ class Answer
     }
 
     /**
-     * Ответное сообщение
+     * Reply message Object
      * @return Message
      */
     public function getMessage()
