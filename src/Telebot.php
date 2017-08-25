@@ -402,7 +402,7 @@ class Telebot
                     try {
                         call_user_func([$this, $commandName]);
                     } catch (\Exception $ex) {
-                        $this->reply(sprintf('Ошибка выполнения команды: %s', $ex->getMessage()), $e);
+                        $this->reply(sprintf('Ошибка выполнения команды: %s', $ex->getMessage()));
                     }
                 }
             } else {
@@ -866,7 +866,7 @@ class Telebot
         if (!isset($args[1]) || !is_numeric($args[1])) throw new \Exception('Please provide user id');
         $user = $args[1];
         $this->db->add('config.trust', $user);
-        $this->reply(sprintf('User %s now in trust list', $user), $e);
+        $this->reply(sprintf('User %s now in trust list', $user));
     }
 
     /**
@@ -910,12 +910,12 @@ class Telebot
         foreach ($this->getConfig('config.trust', []) as $k => $trustedUser) {
             if ($trustedUser == $user) {
                 unset($this->db['config']['trust'][$k]);
-                $this->reply(sprintf('User %s has been removed from trust list', $user), $e);
+                $this->reply(sprintf('User %s has been removed from trust list', $user));
                 $this->db->save();
                 return;
             }
         }
-        $this->reply(sprintf('User %s not found in trust list', $user), $e);
+        $this->reply(sprintf('User %s not found in trust list', $user));
     }
 
     /**
@@ -933,7 +933,7 @@ class Telebot
             $lines = explode("\n", $this->cleanDoc($doc));
             $commands[] = sprintf("/%s - <i>%s</i>", $botCommand, $lines[0]);
         }
-        $this->reply(implode("\n", $commands), $e);
+        $this->reply(implode("\n", $commands));
     }
 
     /**
