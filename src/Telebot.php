@@ -239,17 +239,20 @@ class Telebot
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
                 if ($this->isMessageAllowed($message)) {
-                    System_Daemon::info('[%s][OK] Received message %s from trusted user %s', $update->getUpdateId(), $message->getText(), $fromName);
+                    System_Daemon::info('[%s][OK] Received message %s from trusted user %s',
+                        $update->getUpdateId(), $message->getText(), $fromName);
                     $this->handle($update->getMessage());
                 } else {
-                    System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s', $update->getUpdateId(), $message->getText(), $fromName);
+                    System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s',
+                        $update->getUpdateId(), $message->getText(), $fromName);
                 }
             } else {
-                System_Daemon::warning('[%s][WARN] Message with empty body: %s', $update->getUpdateId(), json_encode($message, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+                System_Daemon::warning('[%s][WARN] Message with empty body: %s',
+                    $update->getUpdateId(), json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             }
         } else {
-            System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s', $update->getUpdateId(),
-                json_encode($update, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+            System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s',
+                $update->getUpdateId(), json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
 
@@ -307,7 +310,8 @@ class Telebot
      * @param InlineQuery $inlineQuery
      * @return false|AbstractInlineQueryResult[]
      */
-    protected function handleInlineQuery(InlineQuery $inlineQuery) {
+    protected function handleInlineQuery(InlineQuery $inlineQuery)
+    {
         System_Daemon::warning('Inline query handler not implemented');
         return false;
     }
@@ -528,7 +532,55 @@ class Telebot
         $target = $this->getTarget($e);
         if (!$target)
             return;
-        return $this->telegram->sendMessage($target, $text, 'HTML', false, null, $markup);
+        return $this->sendMessage($target, $text, 'HTML', false, null, $markup);
+    }
+
+    /**
+     * Use this method to send text messages. On success, the sent \TelegramBot\Api\Types\Message is returned.
+     *
+     * @param int|string $to
+     * Target chat id
+     * @param string $message
+     * Your message
+     * @param string|null $parseMode
+     * How telegram will parse your message. Should be html or markdown
+     * @param bool $disablePreview
+     * Disable preview of links
+     * @param int|null $replyToMessageId
+     * Reply to message
+     * @param Types\ReplyKeyboardMarkup|Types\ReplyKeyboardHide|Types\ForceReply|null $replyMarkup
+     * Use reply markup
+     * @param bool $disableNotification
+     *
+     * @return \TelegramBot\Api\Types\Message
+     * Returns last sended message Object
+     * @throws \TelegramBot\Api\InvalidArgumentException
+     * @throws \TelegramBot\Api\Exception
+     */
+    public function sendMessage(
+        $to,
+        $message,
+        $parse = 'HTML',
+        $disablePreview = false,
+        $replyToMessageId = null,
+        $replyMarkup = null,
+        $disableNotification = false,
+        $allowChunks = true
+    )
+    {
+        if (mb_strlen($message) > 4096) {
+            if ($allowChunks) {
+                $chunks = mb_split($message, 4096);
+                $last = null;
+                foreach ($chunks as $message) {
+                    $last = $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
+                }
+                return $last;
+            } else {
+                $message = mb_substr($message, 0, 4096);
+            }
+        }
+        return $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
     }
 
     /**
@@ -763,7 +815,7 @@ class Telebot
             $rm = new ForceReply(true, false);
         }
         if ($multiple) $rm->setOneTimeKeyboard(false);
-        $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
+        $send = $this->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
         $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple);
         return $send;
     }
@@ -841,7 +893,7 @@ class Telebot
      */
     public function askInline($text, $answers = [], $callback = null)
     {
-        System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) : ''));
+        System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''));
         $e = $this->e;
         if (is_array($answers)) {
             $answers = new InlineKeyboardMarkup($answers);
