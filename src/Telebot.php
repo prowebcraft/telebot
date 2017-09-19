@@ -648,14 +648,16 @@ class Telebot
     }
 
     /**
-     * Обертка для получения конфигурации текущего чата
+     * Get config for chat scope
      * @param $key
-     * @param $default
+     * @param null $default
+     * @param null $chatId
      * @return mixed
      */
-    public function getChatConfig($key, $default = null)
+    public function getChatConfig($key, $default = null, $chatId = null)
     {
-        $key = 'chat.' . $this->getChatId() . '.' . $key;
+        if ($chatId === null) $chatId = $this->getChatId();
+        $key = 'chat.' . $chatId . '.' . $key;
         return $this->db->get($key, $default);
     }
 
@@ -688,9 +690,10 @@ class Telebot
      * @param bool $save
      * @return mixed
      */
-    public function setChatConfig($key, $value, $save = true)
+    public function setChatConfig($key, $value, $save = true, $chatId = null)
     {
-        $key = 'chat.' . $this->getChatId() . '.' . $key;
+        if ($chatId === null) $chatId = $this->getChatId();
+        $key = 'chat.' . $chatId . '.' . $key;
         return $this->db->set($key, $value, $save);
     }
 
@@ -701,9 +704,10 @@ class Telebot
      * @param bool $save
      * @return mixed
      */
-    public function addChatConfig($key, $value, $save = true)
+    public function addChatConfig($key, $value, $save = true, $chatId = null)
     {
-        $key = 'chat.' . $this->getChatId() . '.' . $key;
+        if ($chatId === null) $chatId = $this->getChatId();
+        $key = 'chat.' . $chatId . '.' . $key;
         return $this->db->add($key, $value, false, $save);
     }
 
@@ -724,9 +728,10 @@ class Telebot
      * @param bool $save
      * @return mixed
      */
-    public function deleteChatConfig($key, $save = true)
+    public function deleteChatConfig($key, $save = true, $chatId = null)
     {
-        $key = 'chat.' . $this->getChatId() . '.' . $key;
+        if ($chatId === null) $chatId = $this->getChatId();
+        $key = 'chat.' . $chatId . '.' . $key;
         return $this->db->delete($key, $save);
     }
 
