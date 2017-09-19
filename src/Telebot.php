@@ -180,11 +180,19 @@ class Telebot
     }
 
     /**
+     * Method runs just before bot start
+     */
+    protected function beforeStart() {
+
+    }
+
+    /**
      * Starts the bot
      */
     public function start()
     {
         $bot = $this->telegram;
+        $this->beforeStart();
         while (!System_Daemon::isDying() && $this->run) {
             try {
                 $start = microtime(true);
