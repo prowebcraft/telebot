@@ -229,6 +229,11 @@ class Telebot
         $this->update = $update;
         $message = $update->getMessage();
         $fromName = $this->getFromName($message, true, true);
+        if ($update->getEditedMessage()) {
+            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $update->getUpdateId(),
+                $update->getEditedMessage()->getText(), $fromName);
+            return;
+        }
         if (method_exists($this, 'addUser'))
             call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
         if ($inlineQuery = $update->getInlineQuery()) {
@@ -293,10 +298,12 @@ class Telebot
         $message = null;
         if ($this->update->getInlineQuery()) {
             $message = $this->update->getInlineQuery();
-        } elseif ($this->update->getCallbackQuery()) {
+        } else if ($this->update->getCallbackQuery()) {
             $message = $this->update->getCallbackQuery();
-        } elseif ($this->update->getMessage()) {
+        } else if ($this->update->getMessage()) {
             $message = $this->update->getMessage();
+        } else if ($this->update->getEditedMessage()) {
+            $message = $this->update->getEditedMessage();
         }
         return $message;
     }
