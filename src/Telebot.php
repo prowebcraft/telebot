@@ -281,6 +281,10 @@ class Telebot
         if (!$message) {
             $message = $this->getContext();
         }
+        if (!$message) {
+            System_Daemon::warning('Cannot detect from name - unhandled message type %s', $this->update->toJson());
+            return '';
+        }
         $from = $message->getFrom();
         $fromName = $from->getFirstName()
             . ($from->getLastName() ? ' ' . $from->getLastName() : '');
