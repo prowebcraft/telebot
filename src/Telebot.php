@@ -946,7 +946,7 @@ class Telebot
     }
 
     /**
-     * Добавить чат
+     * Allow bot to recieve messages from all users from this chat
      * @global-admin
      * @param Event $e
      * @param null $chatId
@@ -973,9 +973,9 @@ class Telebot
     }
 
     /**
-     * Удалить пользователя из списка доверенных
+     * Remove user from trust list
      * @param null $e
-     * @admin
+     * @global-admin
      * @throws \Exception
      */
     public function untrustCommand()
