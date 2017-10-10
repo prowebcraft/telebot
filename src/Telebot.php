@@ -930,6 +930,24 @@ class Telebot
         return $send;
     }
 
+
+    /**
+     * Update message with text and inline keyboard
+     * @param $id
+     * @param $text
+     * @param $markup
+     */
+    public function updateInlineMessage($id, $text, $markup)
+    {
+        if (is_array($markup)) {
+            $markup = new InlineKeyboardMarkup($markup);
+        }
+        if (!($markup instanceof InlineKeyboardMarkup)) {
+            throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($answers, true));
+        }
+        $this->updateMessage($id, $text, 'html', true, $markup);
+    }
+    
     /**
      * Add user to Trust list
      * @param null $e
