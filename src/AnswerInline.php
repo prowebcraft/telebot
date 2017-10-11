@@ -45,6 +45,15 @@ class AnswerInline
     }
 
     /**
+     * Returns Callback Query Data
+     * @return array
+     */
+    public function getJsonData()
+    {
+        return json_decode($this->getData(), true);
+    }
+
+    /**
      * Returns CallbackQuery of Answer
      * @return CallbackQuery
      */

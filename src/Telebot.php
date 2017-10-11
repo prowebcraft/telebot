@@ -781,7 +781,15 @@ class Telebot
         $target = $this->getTarget();
         if (!$target)
             return;
-        $this->telegram->editMessageText($target, $id, $text, $parse, $disablePreview, $markup);
+        try {
+            $this->telegram->editMessageText($target, $id, $text, $parse, $disablePreview, $markup);
+        } catch (HttpException $e) {
+            if (($e->getCode() == 400 && $e->getMessage() == 'Bad Request: message is not modified')) {
+                System_Daemon::info('Message %s was not modified', $id);
+            } else {
+                throw $e;
+            }
+        }
     }
 
     /**
@@ -877,6 +885,16 @@ class Telebot
                 }
             }
         }
+    }
+
+    /**
+     * Check if we got callback for messageId
+     * @param $messageId
+     * @return bool
+     */
+    protected function hasWaitingReply($messageId)
+    {
+        return isset($this->ask[$messageId]) || isset($this->inlineAnswers[$messageId]);
     }
 
     /**
@@ -1123,5 +1141,5 @@ class Telebot
     {
         return $this->e->getArgument($key, $default);
     }
-
+    
 }
