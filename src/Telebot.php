@@ -511,6 +511,10 @@ class Telebot
             System_Daemon::warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
             return false;
         }
+        if (strpos($doc, '@private') !== false && !$this->isChatPrivate()) {
+            System_Daemon::warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
+            return false;
+        }
         if (in_array($methodName, ['addCron', 'cron', 'run', 'handle', '__construct'])) {
             System_Daemon::warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
             return false;
