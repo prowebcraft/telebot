@@ -24,7 +24,7 @@
     "require": {
         "prowebcraft/dot": "dev-master",
         "prowebcraft/php-json-db": "dev-master",
-        "telegram-bot/api": "2.3.4",
+        "telegram-bot/api": "2.3.5",
         "pear/system_daemon": "dev-master"
     }
 }
