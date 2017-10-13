@@ -549,13 +549,33 @@ class Telebot
      * @param null|ReplyKeyboardMarkup|ForceReply|InlineKeyboardMarkup $markup
      * @return Message|false
      */
-    public function reply($text, $e = null, $markup = null)
+    public function reply($text, $e = null, $markup = null, $markdown = 'HTML')
     {
         System_Daemon::info('[REPLY] %s', $text);
         $target = $this->getTarget($e);
         if (!$target)
             return;
-        return $this->sendMessage($target, $text, 'HTML', false, null, $markup);
+        return $this->sendMessage($target, $text, $markdown, false, null, $markup);
+    }
+
+    /**
+     * Reply to last chat message
+     * @param $text
+     * @param null $markup
+     * @param string $markdown
+     */
+    public function replyToLastMessage($text, $markup = null, $markdown = 'HTML')
+    {
+        return $this->reply($text, null, $markup, $markdown);
+    }
+
+    /**
+     * Reply to last chat message with markdown parser
+     * @param $text
+     */
+    public function replyToLastMessageWithMarkdown($text)
+    {
+        $this->replyToLastMessage($text, null, 'markdown');
     }
 
     /**
