@@ -59,11 +59,8 @@ trait Names
                 $this->setConfig("config.names.$id", $this->registry[$id]);
             }
         }
-        if ($key !== null) {
-            if (!isset($this->registry[$id][$key]))
-                return $default;
-            return $this->registry[$id][$key];
-        }
+        if ($key !== null)
+            return \ArrayHelper::getValue($this->registry[$id], $key, $default);
         return $this->registry[$id];
     }
 
