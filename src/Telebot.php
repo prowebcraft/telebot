@@ -702,8 +702,16 @@ class Telebot
      */
     protected function getChatId()
     {
-        if (!$this->e) return null;
-        return $this->e->getMessage()->getChat()->getId();
+        if ($context = $this->getContext()) {
+            if (method_exists($context, 'getMessage')) {
+                return $context->getMessage()->getChat()->getId();
+            } elseif (method_exists($context, 'getChat') && $context->getChat()) {
+                return $context->getChat()->getId();
+            } else {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
