@@ -251,7 +251,7 @@ class Telebot
             }
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
-                if ($this->isMessageAllowed($message)) {
+                if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
                     System_Daemon::info('[%s][OK] Received message %s from trusted user %s',
                         $update->getUpdateId(), $message->getText(), $fromName);
                     $this->handle($update->getMessage());
