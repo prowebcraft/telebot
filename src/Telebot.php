@@ -405,8 +405,8 @@ class Telebot
                 unset($this->asksUsers[$this->getUserId()]);
                 $this->asksAnswers = [];
             }
-            if (is_callable($callback)) {
-                $callback(new Answer($message, $replyData));
+            if (is_callable($callback) || is_array($callback)) {
+                call_user_func($callback, new Answer($message, $replyData));
             } else {
                 $paramName = $replyData['paramName'];
                 $newMessage = clone $e->getMessage();
@@ -966,7 +966,7 @@ class Telebot
      * Текст сообщения
      * @param array $answers
      * Варианты ответа
-     * @param callable|null $callback
+     * @param callable|array|null $callback
      * Имя параметра, с которым вернется
      * @return Message
      */
@@ -981,7 +981,7 @@ class Telebot
             throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($answers, true));
         }
         $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, null, $answers);
-        $this->inlineAnswers[$send->getMessageId()] = $callback;
+        if ($callback) $this->inlineAnswers[$send->getMessageId()] = $callback;
         return $send;
     }
 
