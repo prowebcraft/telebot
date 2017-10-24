@@ -632,7 +632,12 @@ class Telebot
      */
     protected function getTarget($e = null)
     {
-        if ($e === null) $e = $this->e;
+        if ($e === null) {
+            if ($chatId = $this->getChatId())
+                return $chatId;
+            //Fallback to Event Data
+            $e = $this->e;
+        }
         if ($e instanceof Event) {
             $target = $e->getUserId();
         } elseif (is_numeric($e)) {
