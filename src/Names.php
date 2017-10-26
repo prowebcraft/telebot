@@ -81,6 +81,23 @@ trait Names
     }
 
     /**
+     * Unset User Config
+     * @param null|string $key
+     * @param bool $save
+     * @return mixed
+     */
+    protected function deleteUserConfig($id, $key = null, $save = true)
+    {
+        if ($key !== null) {
+            $key = 'config.names.' . $id . '.' . $key;
+        } else {
+            $key = 'config.names.' . $id;
+        }
+        unset($this->registry[$id]);
+        return $this->db->delete($key, $save);
+    }
+
+    /**
      * Get User Name or Alias
      * @param int $id
      * @param null $default
