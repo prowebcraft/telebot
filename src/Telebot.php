@@ -882,6 +882,7 @@ class Telebot
             $rm = new ReplyKeyboardMarkup($answers, true, true, true);
         } else {
             $rm = new ForceReply(true, false);
+            $useReplyMarkup = true;
         }
         if ($multiple) $rm->setOneTimeKeyboard(false);
         $send = $this->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
