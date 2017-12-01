@@ -221,7 +221,6 @@ class Telebot
                     $this->checkErrorsCount();
                 }
             }
-            System_Daemon::stop();
         } else {
             //Webhook Mode
             $request = file_get_contents("php://input");
@@ -238,6 +237,7 @@ class Telebot
             $update = Update::fromResponse($update);
             $this->handleUpdate($update);
         }
+        System_Daemon::stop();
     }
 
     /**
@@ -250,14 +250,14 @@ class Telebot
         $message = $update->getMessage();
         $fromName = $this->getFromName($message, true, true);
         if ($update->getEditedMessage()) {
-            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $update->getUpdateId(),
+            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $this->getChatId(),
                 $update->getEditedMessage()->getText(), $fromName);
             return;
         }
         if (method_exists($this, 'addUser'))
             call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
         if ($inlineQuery = $update->getInlineQuery()) {
-            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $update->getUpdateId(),
+            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $this->getChatId(),
                 $inlineQuery->getQuery(), $fromName);
             if ($result = $this->handleInlineQuery($inlineQuery)) {
                 $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
@@ -265,7 +265,7 @@ class Telebot
         } elseif ($cbq = $update->getCallbackQuery()) {
             $replyForMessageId = $cbq->getMessage()->getMessageId();
             if ($cb = @$this->inlineAnswers[$replyForMessageId]) {
-                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $update->getUpdateId(),
+                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $this->getChatId(),
                     $replyForMessageId, $cbq->getData(), $fromName);
                 call_user_func($cb, new AnswerInline($cbq, $this));
             }
@@ -273,15 +273,15 @@ class Telebot
             if ($message->getText()) {
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
                     System_Daemon::info('[%s][OK] Received message %s from trusted user %s',
-                        $update->getUpdateId(), $message->getText(), $fromName);
+                        $this->getChatId(), $message->getText(), $fromName);
                     $this->handle($update->getMessage());
                 } else {
                     System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s',
-                        $update->getUpdateId(), $message->getText(), $fromName);
+                        $this->getChatId(), $message->getText(), $fromName);
                 }
             } else {
                 System_Daemon::warning('[%s][WARN] Message with empty body: %s',
-                    $update->getUpdateId(), json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    $this->getChatId(), json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             }
         } else {
             System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s',
