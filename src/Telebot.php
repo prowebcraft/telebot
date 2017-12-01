@@ -7,6 +7,10 @@ use Prowebcraft\Telebot\Clients\Basic;
 use Exception;
 use ReflectionClass;
 use ReflectionMethod;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use System_Daemon;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
@@ -187,6 +191,58 @@ class Telebot
 
     }
 
+    public function webhook()
+    {
+        //Check if webhook was set
+        if (php_sapi_name() == "cli") {
+
+            (new Application('telebot', '1.0.0'))
+                ->register('webhook')
+                ->setDescription('Configure webhook of bot')
+                ->addArgument('url', InputArgument::REQUIRED, 'Webhook url')
+                ->setCode(function(InputInterface $input, OutputInterface $output) {
+                    // output arguments and options
+                    $url = $input->getArgument('url');
+                    $reply = $this->telegram->setWebhook($url);
+                    $this->setConfig('webhook', $url, false);
+                    $this->setConfig('webhook_set', time());
+                    $output->writeln("<info>Webhook:</info> <comment>$url</comment> <info>was set</info> <comment>"
+                        . json_encode($reply, JSON_PRETTY_PRINT) . "</comment>");
+                })
+                ->getApplication()
+                ->run();
+
+        } else {
+
+            //Check if webhook was configured
+            if (!($webhook = $this->getConfig('webhook'))) {
+                throw new \InvalidArgumentException('Please set webhook url in config');
+            }
+
+            if (!$this->getConfig('webhook_set')) {
+                $this->telegram->setWebhook($webhook);
+                $this->setConfig('webhook_set', time());
+            }
+
+            $bot = $this->telegram;
+            $this->beforeStart();
+
+            $request = file_get_contents("php://input");
+            if (empty($request))
+                $this->sendErrorResponse('Empty request');
+            $update = json_decode($request, true);
+            if (!$update)
+                $this->sendErrorResponse('Invalid request');
+            if (!Dot::getValue($update, 'update_id')) {
+                System_Daemon::err("Invalid incoming request: %s", $request);
+                $this->sendErrorResponse('Invalid request');
+            }
+            System_Daemon::info("Incoming Request: %s", $request);
+            $update = Update::fromResponse($update);
+            $this->handleUpdate($update);
+        }
+    }
+
     /**
      * Starts the bot
      */
@@ -221,23 +277,11 @@ class Telebot
                     $this->checkErrorsCount();
                 }
             }
+            System_Daemon::stop();
         } else {
-            //Webhook Mode
-            $request = file_get_contents("php://input");
-            if (empty($request))
-                $this->sendErrorResponse('Empty request');
-            $update = json_decode($request, true);
-            if (!$update)
-                $this->sendErrorResponse('Invalid request');
-            if (!Dot::getValue($update, 'update_id')) {
-                System_Daemon::err("Invalid incoming request: %s", $request);
-                $this->sendErrorResponse('Invalid request');
-            }
-            System_Daemon::info("Incoming Request: %s", $request);
-            $update = Update::fromResponse($update);
-            $this->handleUpdate($update);
+            echo 'This method need to be run under console ' . PHP_EOL;
+            exit();
         }
-        System_Daemon::stop();
     }
 
     /**
