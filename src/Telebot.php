@@ -187,7 +187,8 @@ class Telebot
     /**
      * Method runs just before bot start
      */
-    protected function beforeStart() {
+    protected function beforeStart()
+    {
 
     }
 
@@ -200,7 +201,7 @@ class Telebot
                 ->register('webhook')
                 ->setDescription('Configure webhook of bot')
                 ->addArgument('url', InputArgument::REQUIRED, 'Webhook url')
-                ->setCode(function(InputInterface $input, OutputInterface $output) {
+                ->setCode(function (InputInterface $input, OutputInterface $output) {
                     // output arguments and options
                     $url = $input->getArgument('url');
                     $reply = $this->telegram->setWebhook($url);
@@ -1067,7 +1068,7 @@ class Telebot
         }
         $this->updateMessage($id, $text, 'html', true, $markup);
     }
-    
+
     /**
      * Add user to Trust list
      * @param null $e
@@ -1196,7 +1197,7 @@ class Telebot
      */
     protected function isChatGroup()
     {
-        return $this->getChatType() == 'group';
+        return in_array($this->getChatType(), ['group', 'supergroup']);
     }
 
     /**
@@ -1249,7 +1250,8 @@ class Telebot
      * @param $message
      * @param int $code
      */
-    protected function sendErrorResponse($message, $code = 0) {
+    protected function sendErrorResponse($message, $code = 0)
+    {
         $this->sendResponse(array_merge([
             'success' => false,
             'error' => $message,
