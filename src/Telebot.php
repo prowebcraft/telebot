@@ -2,6 +2,7 @@
 
 namespace Prowebcraft\Telebot;
 
+use Prowebcraft\Dot;
 use Prowebcraft\Telebot\Clients\Basic;
 use Exception;
 use ReflectionClass;
@@ -193,31 +194,50 @@ class Telebot
     {
         $bot = $this->telegram;
         $this->beforeStart();
-        while (!System_Daemon::isDying() && $this->run) {
-            try {
-                $start = microtime(true);
-                $updates = $bot->getUpdates($this->lastUpdateId);
-                foreach ($updates as $update) {
-                    $this->lastUpdateId = $update->getUpdateId() + 1;
-                    $this->handleUpdate($update);
-                }
-                $processingTime = microtime(true) - $start;
-                $sleep = $this->stepDelay - $processingTime;
-                $this->count += $processingTime;
 
-                if ($sleep > 0) {
-                    System_Daemon::iterate($sleep);
-                    $this->count += $sleep;
+        if (php_sapi_name() == "cli") {
+            //Deamon mode
+            while (!System_Daemon::isDying() && $this->run) {
+                try {
+                    $start = microtime(true);
+                    $updates = $bot->getUpdates($this->lastUpdateId);
+                    foreach ($updates as $update) {
+                        $this->lastUpdateId = $update->getUpdateId() + 1;
+                        $this->handleUpdate($update);
+                    }
+                    $processingTime = microtime(true) - $start;
+                    $sleep = $this->stepDelay - $processingTime;
+                    $this->count += $processingTime;
+
+                    if ($sleep > 0) {
+                        System_Daemon::iterate($sleep);
+                        $this->count += $sleep;
+                    }
+                } catch (HttpException $e) {
+                    System_Daemon::err("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
+                    $this->checkErrorsCount();
+                } catch (Exception $e) {
+                    System_Daemon::err("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
+                    $this->checkErrorsCount();
                 }
-            } catch (HttpException $e) {
-                System_Daemon::err("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
-                $this->checkErrorsCount();
-            } catch (Exception $e) {
-                System_Daemon::err("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
-                $this->checkErrorsCount();
             }
+            System_Daemon::stop();
+        } else {
+            //Webhook Mode
+            $request = file_get_contents("php://input");
+            if (empty($request))
+                $this->sendErrorResponse('Empty request');
+            $update = json_decode($request, true);
+            if (!$update)
+                $this->sendErrorResponse('Invalid request');
+            if (!Dot::getValue($update, 'update_id')) {
+                System_Daemon::err("Invalid incoming request: %s", $request);
+                $this->sendErrorResponse('Invalid request');
+            }
+            System_Daemon::info("Incoming Request: %s", $request);
+            $update = Update::fromResponse($update);
+            $this->handleUpdate($update);
         }
-        System_Daemon::stop();
     }
 
     /**
@@ -1179,5 +1199,34 @@ class Telebot
     {
         return $this->e->getArgument($key, $default);
     }
-    
+
+    /**
+     * Finish web request with error
+     * @param $message
+     * @param int $code
+     */
+    protected function sendErrorResponse($message, $code = 0) {
+        $this->sendResponse(array_merge([
+            'success' => false,
+            'error' => $message,
+            'code' => $code
+        ]));
+    }
+
+    /**
+     * Send web response
+     * @param $result
+     */
+    protected function sendResponse($result = [])
+    {
+        header("Content-Type: application/json; charset=UTF-8", true);
+        if (!is_array($result)) $result = [];
+        $result = array_merge([
+            'success' => true
+        ], $result);
+        $response = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        echo $response;
+        exit();
+    }
+
 }
