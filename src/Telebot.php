@@ -28,6 +28,9 @@ use TelegramBot\Api\Types\Update;
 class Telebot
 {
 
+    const MODE_WEBHOOK = 1;
+    const MODE_DEAMON = 2;
+
     public $matches = [];
     public $cron = [
         'm' => [],
@@ -50,15 +53,16 @@ class Telebot
     ];
     /** @var Data|null */
     protected $db = null;
-    /** @var Event $e Текущее сообщение */
+    /** @var Event $e Last Event */
     protected $e;
-    /** @var Update $update */
+    /** @var Update $update Last Update */
     protected $update;
     protected $asks = [];
     protected $asksUsers = [];
     protected $asksAnswers = [];
     protected $inlineAnswers = [];
     private $lastUpdateId = null;
+    protected $runMode = self::MODE_DEAMON;
 
     public function __construct($appName, $description, $author, $email, $options = [])
     {
@@ -225,6 +229,7 @@ class Telebot
                 $this->setConfig('webhook_set', time());
             }
 
+            $this->runMode = self::MODE_WEBHOOK;
             $bot = $this->telegram;
             $this->beforeStart();
 
