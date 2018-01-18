@@ -526,6 +526,15 @@ class Telebot
      */
     protected function getChatType()
     {
+        if ($context = $this->getContext()) {
+            if (method_exists($context, 'getMessage')) {
+                return $context->getMessage()->getChat()->getType();
+            } elseif (method_exists($context, 'getChat') && $context->getChat()) {
+                return $context->getChat()->getType();
+            } else {
+                return null;
+            }
+        }
         if (!$this->e) return null;
         return $this->e->getMessage()->getChat()->getType();
     }
