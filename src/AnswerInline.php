@@ -30,7 +30,7 @@ class AnswerInline
      * If true, an alert will be shown by the client instead of a notification at the top of the chat screen. Defaults to false.
      * @return bool
      */
-    public function reply($text, $showAlert = false)
+    public function reply($text = null, $showAlert = false)
     {
         return $this->bot->telegram->answerCallbackQuery($this->getCallbackQuery()->getId(), $text, $showAlert);
     }

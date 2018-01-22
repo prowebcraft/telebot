@@ -118,14 +118,37 @@ class Telebot
         $apiKey = $db->get('config.api');
         if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
 
+        //Restore Waiting Messages
+        $this->restoreReplies();
+
         /** @var BotApi|Client $bot */
         $bot = new Basic($db->get('config.api'));
         $this->telegram = $bot;
     }
 
-    public function getRunArg($key = null)
-    {
+    /**
+     * Restore pending replies
+     */
+    protected function restoreReplies() {
+        $this->inlineAnswers = $this->getConfig('replies.inline', []);
+        $this->asksUsers = $this->getConfig('replies.asks_users', []);
+        $this->asksAnswers = $this->getConfig('replies.asks_answers', []);
+        $this->asks = $this->getConfig('replies.asks', []);
+        $updated = false;
+        foreach ($this->asks as $chat => $asks) {
+            foreach ($asks as $k => $ask) {
+                if (!empty($ask['time']) && $ask['time'] < time() - 60*60*24*30) {
+                    unset($this->asks[$chat][$k]);
+                    $updated = true;
+                }
+            }
+        }
+        if ($updated)
+            $this->saveReplies();
+    }
 
+    protected function getRunArg($key = null)
+    {
         if (isset($_SERVER['argv'])) {
             // Scan command line attributes for allowed arguments
             foreach ($_SERVER['argv'] as $k => $arg) {
@@ -299,39 +322,44 @@ class Telebot
         $this->update = $update;
         $message = $update->getMessage();
         $fromName = $this->getFromName($message, true, true);
+        $chatId = $this->getChatId();
         if ($update->getEditedMessage()) {
-            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $this->getChatId(),
+            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $chatId,
                 $update->getEditedMessage()->getText(), $fromName);
             return;
         }
         if (method_exists($this, 'addUser'))
             call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
         if ($inlineQuery = $update->getInlineQuery()) {
-            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $this->getChatId(),
+            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $chatId,
                 $inlineQuery->getQuery(), $fromName);
             if ($result = $this->handleInlineQuery($inlineQuery)) {
                 $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
             }
         } elseif ($cbq = $update->getCallbackQuery()) {
             $replyForMessageId = $cbq->getMessage()->getMessageId();
-            if ($cb = @$this->inlineAnswers[$replyForMessageId]) {
-                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $this->getChatId(),
+            if ($callback = @$this->inlineAnswers[$chatId][$replyForMessageId]) {
+                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
                     $replyForMessageId, $cbq->getData(), $fromName);
-                call_user_func($cb, new AnswerInline($cbq, $this));
+                if (is_string($callback) && method_exists($this, $callback))
+                    $callback = [ $this, $callback ];
+                if (is_callable($callback) || is_array($callback)) {
+                    call_user_func($callback, new AnswerInline($cbq, $this));
+                }
             }
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
                     System_Daemon::info('[%s][OK] Received message %s from trusted user %s',
-                        $this->getChatId(), $message->getText(), $fromName);
+                        $chatId, $message->getText(), $fromName);
                     $this->handle($update->getMessage());
                 } else {
                     System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s',
-                        $this->getChatId(), $message->getText(), $fromName);
+                        $chatId, $message->getText(), $fromName);
                 }
             } else {
                 System_Daemon::warning('[%s][WARN] Message with empty body: %s',
-                    $this->getChatId(), json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                    $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             }
         } else {
             System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s',
@@ -449,48 +477,59 @@ class Telebot
 
         $replyToId = null;
         $replyMatch = 'unknown';
+        $chatId = $this->getChatId();
+        $userId = $this->getUserId();
+        $guessReply = false;
         if ($message->getText()[0] != '/' && $message->getReplyToMessage()) {
-            //Получен ответ на конкретное сообщение
+            //Direct reply
             $replyToId = $message->getReplyToMessage()->getMessageId();
             $replyMatch = 'To Message Id';
-        } elseif (isset($this->asksAnswers[$message->getText()])) {
-            //Проверка на ожидание вариантов ответа
-            $replyToId = $this->asksAnswers[$message->getText()];
+        } elseif ($id = Dot::getValue($this->asksAnswers, "$chatId.{$message->getText()}")) {
+            //Reply match by answer variant
+            $replyToId = $id;
             $replyMatch = 'By Text Answer';
-        } elseif ($message->getText()[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$this->getUserId()])) {
-            //Проверка на ожидание сообщения конкретного пользователя
-//            $replyToId = $this->asksUsers[$this->getUserId()];
-//            $replyMatch = 'By Waiting User Input';
+        } elseif ($message->getText()[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$chatId][$userId])) {
+            //Reply by waiting user input
+            //Check question type
+            if ($replyData = Dot::getValue($this->asks, "$chatId.{$this->asksUsers[$chatId][$userId]}")) {
+                //If Reply has direct answer varians, check message text
+                $guessReply = true;
+                $replyToId = $this->asksUsers[$chatId][$userId];
+                $replyMatch = 'By Waiting User Input';
+                unset($this->asksUsers[$chatId][$userId]);
+            }
         }
-        if ($replyToId && isset($this->asks[$replyToId])) {
+        if ($replyToId && $replyData = Dot::getValue($this->asks, "$chatId.$replyToId")) {
             //ReplyTo Message
-            System_Daemon::info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $this->asks[$replyToId]['question'], $message->getText());
-            $replyData = $this->asks[$replyToId];
-            /* @var Event $e */
-            $e = $replyData['e'];
+            System_Daemon::info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $message->getText());
             $replyText = trim($message->getText());
-            $callback = $replyData['callback'];
-            if (!$replyData['multiple']) {
-                unset($this->asks[$replyToId]);
-                unset($this->asksUsers[$this->getUserId()]);
-                $this->asksAnswers = [];
-            }
-            if (is_callable($callback) || is_array($callback)) {
-                call_user_func($callback, new Answer($message, $replyData));
+            if (!empty($replyData['answers']) && !$this->inDeepArray($replyData['answers'], $replyText) !== false) {
+                System_Daemon::warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
+                $replyToId = null;
             } else {
-                $paramName = $replyData['paramName'];
-                $newMessage = clone $e->getMessage();
-                $newMessage->setText($newMessage->getText() . ' ' . ($paramName ? '--' . $paramName . '=' : '') . $replyText);
-                $this->handle($newMessage);
+                $callback = $replyData['callback'];
+                if (!$replyData['multiple']) {
+                    unset($this->asks[$chatId][$replyToId]);
+                    unset($this->asksUsers[$chatId][$userId]);
+                    $this->asksAnswers[$chatId] = [];
+                    $this->saveReplies();
+                }
+                if (is_string($callback) && method_exists($this, $callback))
+                    $callback = [ $this, $callback ];
+                if (is_callable($callback) || is_array($callback)) {
+                    call_user_func($callback, new Answer($message, $replyData));
+                }
             }
-        } else {
+
+        }
+        if (!$replyToId) {
             if ($command[0] == "/") {
                 $command = mb_substr(array_shift($commandParts), 1);
                 if (($atPos = mb_stripos($command, '@'))) $command = mb_substr($command, 0, $atPos);
                 $command = $this->toCamel($command);
                 $commandName = $command . 'Command';
                 if (isset($this->commandAlias[$command])) $commandName = $this->commandAlias[$command];
-                if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName, $this->getUserId())) {
+                if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName, $userId)) {
                     System_Daemon::info('[RUN] Running %s with %s arguments', $commandName, count($commandParts));
                     try {
                         call_user_func([$this, $commandName]);
@@ -628,13 +667,13 @@ class Telebot
      * @param null|ReplyKeyboardMarkup|ForceReply|InlineKeyboardMarkup $markup
      * @return Message|false
      */
-    public function reply($text, $e = null, $markup = null, $markdown = 'HTML')
+    public function reply($text, $e = null, $replyKeyboardMarkup = null, $markdown = 'HTML')
     {
         System_Daemon::info('[REPLY] %s', $text);
         $target = $this->getTarget($e);
         if (!$target)
             return;
-        return $this->sendMessage($target, $text, $markdown, false, null, $markup);
+        return $this->sendMessage($target, $text, $markdown, false, null, $replyKeyboardMarkup);
     }
 
     /**
@@ -643,9 +682,9 @@ class Telebot
      * @param null $markup
      * @param string $markdown
      */
-    public function replyToLastMessage($text, $markup = null, $markdown = 'HTML')
+    public function replyToLastMessage($text, $replyKeyboardMarkup = null, $markdown = 'HTML')
     {
-        return $this->reply($text, null, $markup, $markdown);
+        return $this->reply($text, null, $replyKeyboardMarkup, $markdown);
     }
 
     /**
@@ -936,20 +975,20 @@ class Telebot
     }
 
     /**
-     * Запросить уточнение
+     * Ask user input
      * @param string $text
-     * Текст сообщения
-     * @param array $answers
-     * Варианты ответа
+     * Question text
+     * @param array|null $answers
+     * Answers variant (null for free form)
      * @param callable|null $callback
-     * Имя параметра, с которым вернется
+     * Callback method name (can be closure in daemon mode)
      * @param bool $multiple
-     * Ожидать несколько ответов
+     * Wait for multiple replies
      * @param bool $useReplyMarkup
-     * Отобразить вопрос в виде ответа на сообщение
+     * Show reply markup in question
      * @return Message
      */
-    public function ask($text, $answers = [], $callback = null, $multiple = false, $useReplyMarkup = false)
+    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false)
     {
         System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
@@ -964,44 +1003,56 @@ class Telebot
             $useReplyMarkup = true;
         }
         if ($multiple) $rm->setOneTimeKeyboard(false);
+
+        if ($this->runMode == self::MODE_WEBHOOK && is_callable($callback)) {
+            $error = 'Cannot use callable objects in webhook mode';
+            $trace = @debug_backtrace();
+            System_Daemon::err($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
+            $this->sendErrorResponse($error, 601);
+            return false;
+        }
+
         $send = $this->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
         $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple);
         return $send;
     }
 
     /**
-     * Добавить ожидание ответа
+     * Store waiting reply
      * @param string $text
-     * Текст сообщения
+     * Text
      * @param array $answers
-     * Варианты ответа
-     * @param callable|null $callback
-     * Имя параметра, с которым вернется
+     * Anwers
+     * @param callable|string|null $callback
+     * Callback method name (can be closure in daemon mode)
      * @param bool $multiple
      */
-    protected function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false)
+    private function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false)
     {
         $e = $this->e;
         $payload = [
             'id' => $askMessageId,
             'question' => $text,
             'callback' => $callback,
-            'e' => $e,
             'user' => $e->getUserId(),
             'answers' => $answers,
-            'multiple' => $multiple
+            'multiple' => $multiple,
+            'time' => time()
         ];
-
-        $this->asks[$askMessageId] = $payload;
-        $this->asksUsers[$e->getUserId()] = $askMessageId;
-        $this->asksAnswers = [];
+        $chatId = $this->getChatId();
+        Dot::setValue($this->asks, "{$chatId}.{$askMessageId}", $payload);
+        if ($userId = $this->getUserId())
+            Dot::setValue($this->asksUsers, "{$chatId}.{$userId}", $askMessageId);
+        Dot::setValue($this->asksAnswers, "{$chatId}", []);
         if (!empty($answers) && is_array($answers)) {
             foreach ($answers as $group) {
                 foreach ($group as $answer) {
-                    $this->asksAnswers[$answer] = $askMessageId;
+                    Dot::setValue($this->asksAnswers, "{$chatId}.{$answer}", $askMessageId);
                 }
             }
         }
+
+        $this->saveReplies();
     }
 
     /**
@@ -1011,7 +1062,8 @@ class Telebot
      */
     protected function hasWaitingReply($messageId)
     {
-        return isset($this->ask[$messageId]) || isset($this->inlineAnswers[$messageId]);
+        $chatId = $this->getChatId();
+        return isset($this->asks[$chatId][$messageId]) || isset($this->inlineAnswers[$chatId][$messageId]);
     }
 
     /**
@@ -1029,15 +1081,14 @@ class Telebot
      */
     protected function stopWaitForReply($messageId)
     {
-        unset($this->ask[$messageId]);
-        if ($keys = array_keys($this->asksUsers, $messageId)) {
+        $chatId = $this->getChatId();
+        unset($this->ask[$chatId][$messageId]);
+        if ($keys = array_keys($this->asksUsers[$chatId], $messageId)) {
             foreach ($keys as $key)
-                unset($this->asksUsers[$key]);
+                unset($this->asksUsers[$chatId][$key]);
         }
-        if ($keys = array_keys($this->asksAnswers, $messageId)) {
-            foreach ($keys as $key)
-                unset($this->asksAnswers[$key]);
-        }
+        $this->asksAnswers[$chatId] = [];
+        $this->saveReplies();
     }
 
     /**
@@ -1060,8 +1111,19 @@ class Telebot
         if (!($answers instanceof InlineKeyboardMarkup)) {
             throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($answers, true));
         }
+        if ($this->runMode == self::MODE_WEBHOOK && is_callable($callback)) {
+            $error = 'Cannot use callable objects in webhook mode';
+            $trace = @debug_backtrace();
+            System_Daemon::err($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
+            $this->sendErrorResponse($error, 601);
+            return false;
+        }
         $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, null, $answers);
-        if ($callback) $this->inlineAnswers[$send->getMessageId()] = $callback;
+        if ($callback) {
+            $chatId = $this->getChatId();
+            Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $callback);
+            $this->saveReplies();
+        }
         return $send;
     }
 
@@ -1287,6 +1349,33 @@ class Telebot
         $response = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         echo $response;
         exit();
+    }
+
+    protected function saveReplies()
+    {
+        $this->setConfig('replies', [
+            'asks' => $this->asks,
+            'asks_users' => $this->asksUsers,
+            'asks_answers' => $this->asksAnswers,
+            'inline' => $this->inlineAnswers,
+        ]);
+    }
+
+    /**
+     * Search array value recursively
+     * @param array $array
+     * @param string $value
+     * @return bool
+     */
+    protected function inDeepArray(array $array, string $value)
+    {
+        foreach ($array as $k => $v) {
+            $key = $k;
+            if ($value === $v || (is_array($v) && $this->inDeepArray($v, $value))) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }
