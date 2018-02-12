@@ -1177,7 +1177,7 @@ class Telebot
         if (!isset($args[1]) || !is_numeric($args[1])) throw new \Exception('Please provide user id');
         $user = $args[1];
         if ($name = $this->getUserName($user)) {
-            $this->addChatConfig('admin', $user);
+            $this->addChatConfig('admins', $user);
             $this->reply(sprintf('User %s is admin now', $name));
         } else {
             $this->reply(sprintf('User %s is unknown', $user));
