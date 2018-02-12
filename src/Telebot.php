@@ -28,6 +28,8 @@ use TelegramBot\Api\Types\Update;
 class Telebot
 {
 
+    use Names;
+
     const MODE_WEBHOOK = 1;
     const MODE_DEAMON = 2;
 
@@ -657,7 +659,10 @@ class Telebot
     protected function isAdmin()
     {
         if (!$this->e) return false;
-        return $this->isGlobalAdmin() || in_array($this->getUserId(), $this->getConfig('config.admins', []));
+        if ($this->isGlobalAdmin())
+            return true;
+        $admins = array_merge($this->getConfig('config.admins', []), $this->getChatConfig('admins', []));
+        return in_array($this->getUserId(), $admins);
     }
 
     /**
@@ -1158,6 +1163,25 @@ class Telebot
         $user = $args[1];
         $this->db->add('config.trust', $user);
         $this->reply(sprintf('User %s now in trust list', $user));
+    }
+
+    /**
+     * Add user to Trust list
+     * @param null $e
+     * @global-admin
+     * @throws \Exception
+     */
+    public function adminCommand()
+    {
+        $args = $this->e->getArgs();
+        if (!isset($args[1]) || !is_numeric($args[1])) throw new \Exception('Please provide user id');
+        $user = $args[1];
+        if ($name = $this->getUserName($user)) {
+            $this->addChatConfig('admin', $user);
+            $this->reply(sprintf('User %s is admin now', $name));
+        } else {
+            $this->reply(sprintf('User %s is unknown', $user));
+        }
     }
 
     /**
