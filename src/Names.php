@@ -10,6 +10,8 @@
 namespace Prowebcraft\Telebot;
 
 
+use Prowebcraft\Dot;
+
 trait Names
 {
 
@@ -60,7 +62,7 @@ trait Names
             }
         }
         if ($key !== null)
-            return \ArrayHelper::getValue($this->registry[$id], $key, $default);
+            return Dot::getValue($this->registry[$id], $key, $default);
         return $this->registry[$id];
     }
 
