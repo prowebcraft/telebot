@@ -284,6 +284,7 @@ class Telebot
         $this->beforeStart();
 
         if (php_sapi_name() == "cli") {
+            $bot->setWebhook();
             //Deamon mode
             while (!System_Daemon::isDying() && $this->run) {
                 try {
@@ -470,7 +471,7 @@ class Telebot
     }
 
     /**
-     * Вернуть идентификатор текущего пользователя
+     * Return current user id
      * @return int|null
      */
     protected function getUserId()
@@ -493,7 +494,7 @@ class Telebot
     }
 
     /**
-     * Проверяет право на прием сообщения
+     * Check access for sending messages
      * @param Message $message
      * @return bool
      */
@@ -505,6 +506,8 @@ class Telebot
             return true;
         if (!$this->isChatPrivate() && $this->isAdmin())
             return true;
+//        if (!$this->isChatPrivate() && $message->getFrom())
+//            return true;
 
         $trustedUsers = array_merge([$this->getConfig('config.globalAdmin', [])],
             $this->getConfig('config.admins', []),
@@ -516,7 +519,7 @@ class Telebot
     }
 
     /**
-     * Обертка для получения конфигурации
+     * Get global configuration
      * @param $key
      * @param $default
      * @return mixed
@@ -527,7 +530,7 @@ class Telebot
     }
 
     /**
-     * Обработка команды
+     * Handle incoming message
      * @param Message $message
      */
     public function handle($message)
@@ -598,7 +601,7 @@ class Telebot
                     try {
                         call_user_func([$this, $commandName]);
                     } catch (\Exception $ex) {
-                        $this->reply(sprintf('Ошибка выполнения команды: %s', $ex->getMessage()));
+                        $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
                     }
                 }
             } else {
@@ -609,7 +612,7 @@ class Telebot
                             try {
                                 call_user_func_array([$this, $commandName], [$matches]);
                             } catch (\Exception $ex) {
-                                $this->reply(sprintf('Ошибка выполнения команды: %s', $ex->getMessage()));
+                                $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
                             }
                         }
                     }
@@ -718,7 +721,7 @@ class Telebot
     }
     
     /**
-     * Является или текущий запрос от админа
+     * If current user has admin privelleges
      * @return bool
      */
     protected function isAdmin()
@@ -865,10 +868,7 @@ class Telebot
     /**
      * @param $command
      * @param string $type
-     * Частота выполнения:
-     * m - раз в минуту
-     * h - раз в час
-     * d - раз в день
+     * @deprecated
      */
     public function addCron($command, $type = 'm')
     {
@@ -890,7 +890,7 @@ class Telebot
     }
 
     /**
-     * Вернуть идентификатор текущего чата
+     * Current chat or group id
      * @return int|null
      */
     protected function getChatId()
@@ -908,10 +908,11 @@ class Telebot
     }
 
     /**
-     * Обертка для установки конфигурации
+     * Set Global configuration
      * @param $key
      * @param $value
      * @param bool $save
+     * Store configuration
      * @return mixed
      */
     public function setConfig($key, $value, $save = true)
@@ -920,7 +921,7 @@ class Telebot
     }
 
     /**
-     * Обертка для установки конфигурации для текущего чата
+     * Chat-scope configuration
      * @param $key
      * @param $value
      * @param bool $save
@@ -934,7 +935,7 @@ class Telebot
     }
 
     /**
-     * Обертка для установки конфигурации на уровне чата
+     * Add item to chat-scope config
      * @param $key
      * @param $value
      * @param bool $save
@@ -948,7 +949,7 @@ class Telebot
     }
 
     /**
-     * Обертка для удаления конфигурации
+     * Remove config
      * @param $key
      * @param bool $save
      * @return mixed
@@ -959,7 +960,7 @@ class Telebot
     }
 
     /**
-     * Обертка для удаления конфигурации на уровне чата
+     * Delete chat-scope config item
      * @param $key
      * @param bool $save
      * @return mixed
@@ -971,6 +972,10 @@ class Telebot
         return $this->db->delete($key, $save);
     }
 
+    /**
+     * @param string $type
+     * @deprecated
+     */
     public function cron($type = 'm')
     {
         if (isset($this->cron[$type]) && is_array($this->cron[$type])) {
@@ -1162,13 +1167,13 @@ class Telebot
     }
 
     /**
-     * Запросить уточнение путем размещения Inline кнопок под сообщением
+     * Ask question with inline buttons
      * @param string $text
-     * Текст сообщения
+     * Question text
      * @param array $answers
-     * Варианты ответа
+     * Array of buttons
      * @param callable|array|null $callback
-     * Имя параметра, с которым вернется
+     * Callback method name (string preffered)
      * @return Message
      */
     public function askInline($text, $answers = [], $callback = null)
