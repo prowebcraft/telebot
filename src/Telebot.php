@@ -284,7 +284,12 @@ class Telebot
         $this->beforeStart();
 
         if (php_sapi_name() == "cli") {
-            $bot->setWebhook();
+            if ($this->getConfig('webhook_set')) {
+                $bot->setWebhook();
+                $this->deleteConfig('webhook_set');
+                System_Daemon::warning("Switching to daemon mode from Webhook");
+            }
+
             //Deamon mode
             while (!System_Daemon::isDying() && $this->run) {
                 try {
@@ -1270,7 +1275,7 @@ class Telebot
     }
 
     /**
-     * Обертка для установки конфигурации
+     * Add item to global config array
      * @param $key
      * @param $value
      * @param bool $save
