@@ -219,7 +219,38 @@ class Telebot
      */
     protected function beforeStart()
     {
+        $this->getBotInfo();
+    }
 
+    /**
+     * Get Bot Info
+     * @param null $key
+     * @return mixed
+     * @throws \TelegramBot\Api\Exception
+     * @throws \TelegramBot\Api\InvalidArgumentException
+     */
+    protected function getBotInfo($key = null)
+    {
+        if (!($bot = $this->getConfig('bot'))) {
+            $bot = $this->telegram->getMe();
+            $this->setConfig('bot', [
+                'id' => $bot->getId(),
+                'name' => $bot->getFirstName(),
+                'username' => $bot->getUsername(),
+            ]);
+        }
+        return Dot::getValue($bot, $key);
+    }
+
+    /**
+     * Get Bot Id
+     * @return mixed
+     * @throws \TelegramBot\Api\Exception
+     * @throws \TelegramBot\Api\InvalidArgumentException
+     */
+    protected function getBotId()
+    {
+        return $this->getBotInfo('id');
     }
 
     public function webhook()
@@ -367,7 +398,11 @@ class Telebot
                         $chatId, $message->getText(), $fromName);
                 }
             } else {
-                if ($message->isGroupChatCreated()) {
+                if ($message->getNewChatMember() && $message->getNewChatMember()->getId() == $this->getBotId()) {
+                    System_Daemon::info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onJoinChat();
+                } else if ($message->isGroupChatCreated()) {
                     System_Daemon::info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onGroupChatCreated();
@@ -411,13 +446,21 @@ class Telebot
     /**
      * Bot has been added to a new group chat
      */
+    protected function onJoinChat()
+    {
+        $this->setChatOwner();
+    }
+
+    /**
+     * New Group Chat has been created
+     */
     protected function onGroupChatCreated()
     {
         $this->setChatOwner();
     }
 
     /**
-     * Bot has been added to a new supergroup
+     * New SuperGroup Chat has been created
      */
     protected function onSuperGroupChatCreated()
     {
@@ -425,7 +468,7 @@ class Telebot
     }
 
     /**
-     * Bot has been added to a new channel
+     *  New Channel has been created
      */
     protected function onChannelCreated()
     {
