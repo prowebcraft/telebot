@@ -66,7 +66,7 @@ class Telebot
     private $lastUpdateId = null;
     protected $runMode = self::MODE_DEAMON;
 
-    public function __construct($appName, $description, $author, $email, $options = [])
+    public function __construct($appName, $description = null, $author = null, $email = null, $options = [])
     {
         if ($this->getRunArg('help')) {
             echo 'Usage: ' . $_SERVER['argv'][0] . ' [runmode]' . "\n";
@@ -128,6 +128,7 @@ class Telebot
         $this->telegram = $bot;
     }
 
+    
     /**
      * Restore pending replies
      */
@@ -344,7 +345,7 @@ class Telebot
                 System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
                     $replyForMessageId, $cbq->getData(), $fromName);
                 if (is_string($callback) && method_exists($this, $callback))
-                    $callback = [ $this, $callback ];
+                    $callback = [$this, $callback];
                 if (is_callable($callback) || is_array($callback)) {
                     call_user_func($callback, new AnswerInline($cbq, $this));
                 }
@@ -360,8 +361,25 @@ class Telebot
                         $chatId, $message->getText(), $fromName);
                 }
             } else {
-                System_Daemon::warning('[%s][WARN] Message with empty body: %s',
-                    $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                if ($message->isGroupChatCreated()) {
+                    System_Daemon::info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onGroupChatCreated();
+                } else if ($message->isSupergroupChatCreated()) {
+                    System_Daemon::info('[%s][NEW] Bot has been invited to a new supergroup chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onSuperGroupChatCreated();
+                } else if ($message->isChannelChatCreated()) {
+                    System_Daemon::info('[%s][NEW] Bot has been invited to a new channel %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onChannelCreated();
+                } else if ($message->getNewChatPhoto()) {
+                    System_Daemon::info('[%s][INFO] New chat photo is set by %s',
+                        $chatId, $fromName);
+                } else {
+                    System_Daemon::warning('[%s][WARN] Message with empty body: %s',
+                        $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                }
             }
         } else {
             System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s',
@@ -370,7 +388,46 @@ class Telebot
     }
 
     /**
-     * Получить наименование автора сообщения
+     * Set Chat Owner
+     * @param $id
+     */
+    protected function setChatOwner($id = null)
+    {
+        if ($id === null) $id = $this->getUserId();
+        $this->setChatConfig('owner', $id);
+    }
+
+    protected function addChatAdmin($id)
+    {
+        $this->addChatConfig('admins', $id);
+    }
+
+    /**
+     * Bot has been added to a new group chat
+     */
+    protected function onGroupChatCreated()
+    {
+        $this->setChatOwner();
+    }
+
+    /**
+     * Bot has been added to a new supergroup
+     */
+    protected function onSuperGroupChatCreated()
+    {
+        $this->onGroupChatCreated();
+    }
+
+    /**
+     * Bot has been added to a new channel
+     */
+    protected function onChannelCreated()
+    {
+        $this->onGroupChatCreated();
+    }
+
+    /**
+     * Get Message author name
      * @param $message
      * @param bool $username
      * @param bool $id
@@ -444,6 +501,11 @@ class Telebot
     {
         if (($whiteListGroups = $this->getConfig('config.whiteGroups', [])) && in_array($message->getChat()->getId(), $whiteListGroups))
             return true;
+        if ($this->isGlobalAdmin())
+            return true;
+        if (!$this->isChatPrivate() && $this->isAdmin())
+            return true;
+
         $trustedUsers = array_merge([$this->getConfig('config.globalAdmin', [])],
             $this->getConfig('config.admins', []),
             $this->getConfig('config.trust', [])
@@ -643,15 +705,18 @@ class Telebot
     }
 
     /**
-     * Является или текущий запрос от суперадмина
+     * Check if current user has global admin or chat owner privelleges
      * @return bool
      */
     protected function isGlobalAdmin()
     {
         if (!$this->e) return false;
-        return $this->getUserId() == $this->getConfig('config.globalAdmin');
+        $userId = $this->getUserId();
+        if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId)
+            return true;
+        return $userId == $this->getConfig('config.globalAdmin');
     }
-
+    
     /**
      * Является или текущий запрос от админа
      * @return bool
