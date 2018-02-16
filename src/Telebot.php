@@ -895,7 +895,7 @@ class Telebot
                 $disableNotification
             );
         } catch (Exception $e) {
-            System_Daemon::error('Error sending photo %s - %s', $photo, $e->getMessage());
+            System_Daemon::err('Error sending photo %s - %s', $photo, $e->getMessage());
             return false;
         }
     }
