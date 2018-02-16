@@ -127,7 +127,6 @@ class Telebot
         $bot = new Basic($db->get('config.api'));
         $this->telegram = $bot;
     }
-
     
     /**
      * Restore pending replies
@@ -780,7 +779,7 @@ class Telebot
         $admins = array_merge($this->getConfig('config.admins', []), $this->getChatConfig('admins', []));
         return in_array($this->getUserId(), $admins);
     }
-
+    
     /**
      * Reply to user or chat
      * @param $text
@@ -866,6 +865,43 @@ class Telebot
     }
 
     /**
+     * Use this method to send photos. On success, the sent Message is returned.
+     *
+     * @param \CURLFile|string $photo
+     * @param string|null $caption
+     * @param int|null $replyToMessageId
+     * @param Types\ReplyKeyboardMarkup|Types\ReplyKeyboardHide|Types\ForceReply|null $replyMarkup
+     * @param bool $disableNotification
+     * @param int|string $chatId chat_id or @channel_name
+     *
+     * @return \TelegramBot\Api\Types\Message
+     */
+    public function sendPhoto(
+        $photo,
+        $caption = '',
+        $replyToMessageId = null,
+        $replyMarkup = null,
+        $disableNotification = false,
+        $chatId = null)
+    {
+        try {
+            if ($chatId === null) $chatId = $this->getChatId();
+            return $this->telegram->sendPhoto(
+                $chatId,
+                $photo,
+                $caption,
+                $replyToMessageId,
+                $replyMarkup,
+                $disableNotification
+            );
+        } catch (Exception $e) {
+            System_Daemon::error('Error sending photo %s - %s', $photo, $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get target user id based on context
      * @param $e
      * @return bool|int|string
      */
