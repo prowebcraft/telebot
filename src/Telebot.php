@@ -1470,7 +1470,7 @@ class Telebot
             $this->sendErrorResponse($error, 601);
             return false;
         }
-        $send = $this->telegram->sendMessage($this->getUserId(), $text, 'HTML', true, null, $answers);
+        $send = $this->telegram->sendMessage($this->getChatId(), $text, 'HTML', true, null, $answers);
         if ($callback) {
             $chatId = $this->getChatId();
             Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $callback);
