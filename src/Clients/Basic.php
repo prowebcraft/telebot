@@ -12,8 +12,8 @@ use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Exception;
 
 /**
- * Class Classic
- * @package Aristos\Clients
+ * Extended api from TelegramBot\Api\BotApi
+ * @package Prowebcraft\Telebot\Clients
  * @inheritdoc
  */
 class Basic extends BotApi

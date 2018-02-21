@@ -2,6 +2,10 @@
 
 namespace Prowebcraft\Telebot;
 
+use Monolog\Handler\LogglyHandler;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Handler\StreamHandler;
+use Monolog\Logger;
 use Prowebcraft\Dot;
 use Prowebcraft\Telebot\Clients\Basic;
 use Exception;
@@ -66,6 +70,8 @@ class Telebot
     private $lastUpdateId = null;
     protected $runMode = self::MODE_DEAMON;
 
+    protected $logger = null;
+
     public function __construct($appName, $description = null, $author = null, $email = null, $options = [])
     {
         if ($this->getRunArg('help')) {
@@ -78,7 +84,7 @@ class Telebot
         }
         ini_set("default_charset", "UTF-8");
 
-        $runtimeDir = getcwd() . DIRECTORY_SEPARATOR . 'runtime';
+        $runtimeDir = $this->getRuntimeDirectory();
 
         if (!file_exists($runtimeDir))
             mkdir($runtimeDir, 0777, true);
@@ -98,6 +104,30 @@ class Telebot
         unset($options[0]);
         System_Daemon::setOptions($options);
 
+        $this->db = $db = new Data([
+            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json'
+        ]);
+        $apiKey = $db->get('config.api');
+        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
+
+        //Restore Waiting Messages
+        $this->restoreReplies();
+
+        /** @var BotApi|Client $bot */
+        $bot = new Basic($db->get('config.api'));
+        $this->telegram = $bot;
+
+        //Create Logger
+        $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
+        $this->configLogger();
+        $this->logger->info('Bot is ready', [
+            'time' => time(),
+            'some_data' => [
+                'hey' => 1,
+                'yo' => 2
+            ]
+        ]);
+
         if ($this->getRunArg('write-initd')) {
             if (($initd_location = System_Daemon::writeAutoRun()) === false) {
                 System_Daemon::notice('unable to write init.d script');
@@ -114,18 +144,20 @@ class Telebot
             System_Daemon::start();
         }
 
-        $this->db = $db = new Data([
-            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json'
-        ]);
-        $apiKey = $db->get('config.api');
-        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
+    }
 
-        //Restore Waiting Messages
-        $this->restoreReplies();
-
-        /** @var BotApi|Client $bot */
-        $bot = new Basic($db->get('config.api'));
-        $this->telegram = $bot;
+    /**
+     * Configure logger handlers and processors
+     */
+    protected function configLogger()
+    {
+        $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
+        if ($this->isConsoleMode()) {
+            $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
+        }
+        if ($loggly = $this->getConfig('config.loggly_api_key')) {
+            $this->logger->pushHandler(new LogglyHandler($loggly, Logger::INFO));
+        }
     }
     
     /**
@@ -255,7 +287,7 @@ class Telebot
     public function webhook()
     {
         //Check if webhook was set
-        if (php_sapi_name() == "cli") {
+        if ($this->isConsoleMode()) {
 
             (new Application('telebot', '1.0.0'))
                 ->register('webhook')
@@ -313,7 +345,7 @@ class Telebot
         $bot = $this->telegram;
         $this->beforeStart();
 
-        if (php_sapi_name() == "cli") {
+        if ($this->isConsoleMode()) {
             if ($this->getConfig('webhook_set')) {
                 $bot->setWebhook();
                 $this->deleteConfig('webhook_set');
@@ -1554,6 +1586,24 @@ class Telebot
             }
         }
         return false;
+    }
+
+    /**
+     * Check whenever bot run in console mode
+     * @return bool
+     */
+    protected function isConsoleMode()
+    {
+        return php_sapi_name() == "cli";
+    }
+
+    /**
+     * @return string
+     */
+    protected function getRuntimeDirectory()
+    {
+        $runtimeDir = getcwd() . DIRECTORY_SEPARATOR . 'runtime';
+        return $runtimeDir;
     }
 
 }
