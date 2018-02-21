@@ -9,6 +9,7 @@
 
 namespace Prowebcraft\Telebot;
 
+use Prowebcraft\Dot;
 use TelegramBot\Api\Types\Message;
 
 class Answer
@@ -91,6 +92,18 @@ class Answer
             $this->variant = $this->detectAnswerVariant();
         }
         return $this->variant;
+    }
+
+    /**
+     * Get extra data from payload
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function getExtraData($key, $default = null)
+    {
+        $extra = @$this->info['extra'];
+        return Dot::getValue($extra, $key, $default);
     }
 
     /**

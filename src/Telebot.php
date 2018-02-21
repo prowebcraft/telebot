@@ -770,7 +770,7 @@ class Telebot
         $chatId = $this->getChatId();
         $userId = $this->getUserId();
         $guessReply = false;
-        if ($message->getText()[0] != '/' && $message->getReplyToMessage()) {
+        if ($message->getReplyToMessage() && Dot::getValue($this->asks, "$chatId.{$message->getReplyToMessage()->getMessageId()}")) {
             //Direct reply
             $replyToId = $message->getReplyToMessage()->getMessageId();
             $replyMatch = 'To Message Id';
@@ -1168,6 +1168,20 @@ class Telebot
     }
 
     /**
+     * Current message id
+     * @return int|null
+     */
+    protected function getMessageId()
+    {
+        if ($context = $this->getContext()) {
+            if (method_exists($context, 'getMessage') && $context->getMessage()) {
+                return $context->getMessage()->getMessageId();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Set Global configuration
      * @param $key
      * @param $value
@@ -1321,9 +1335,11 @@ class Telebot
      * Wait for multiple replies
      * @param bool $useReplyMarkup
      * Show reply markup in question
+     * @param array $extraData
+     * Some extra data to pass with payload
      * @return Message
      */
-    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false)
+    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [])
     {
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
@@ -1347,8 +1363,8 @@ class Telebot
             return false;
         }
 
-        $send = $this->sendMessage($e->getUserId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $e->getMessage()->getMessageId() : null, $rm);
-        $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple);
+        $send = $this->sendMessage($this->getChatId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $this->getMessageId() : null, $rm);
+        $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple, $extraData);
         return $send;
     }
 
@@ -1362,16 +1378,17 @@ class Telebot
      * Callback method name (can be closure in daemon mode)
      * @param bool $multiple
      */
-    private function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false)
+    private function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false, $extraData = [])
     {
         $e = $this->e;
         $payload = [
             'id' => $askMessageId,
             'question' => $text,
             'callback' => $callback,
-            'user' => $e->getUserId(),
+            'user' => $this->getUserId(),
             'answers' => $answers,
             'multiple' => $multiple,
+            'extra' => $extraData,
             'time' => time()
         ];
         $chatId = $this->getChatId();
@@ -1453,7 +1470,7 @@ class Telebot
             $this->sendErrorResponse($error, 601);
             return false;
         }
-        $send = $this->telegram->sendMessage($e->getUserId(), $text, 'HTML', true, null, $answers);
+        $send = $this->telegram->sendMessage($this->getUserId(), $text, 'HTML', true, null, $answers);
         if ($callback) {
             $chatId = $this->getChatId();
             Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $callback);
