@@ -125,9 +125,9 @@ class Telebot
 
         if ($this->getRunArg('write-initd')) {
             if (($initd_location = System_Daemon::writeAutoRun()) === false) {
-                System_Daemon::notice('unable to write init.d script');
+                $this->notice('unable to write init.d script');
             } else {
-                System_Daemon::info(
+                $this->info(
                     'sucessfully written startup script: %s',
                     $initd_location
                 );
@@ -472,10 +472,10 @@ class Telebot
             if (!$update)
                 $this->sendErrorResponse('Invalid request');
             if (!Dot::getValue($update, 'update_id')) {
-                System_Daemon::err("Invalid incoming request: %s", $request);
+                $this->error("Invalid incoming request: %s", $request);
                 $this->sendErrorResponse('Invalid request');
             }
-            System_Daemon::info("Incoming Request: %s", $request);
+            $this->info("Incoming Request: %s", $request);
             $update = Update::fromResponse($update);
             $this->handleUpdate($update);
         }
@@ -493,7 +493,7 @@ class Telebot
             if ($this->getConfig('webhook_set')) {
                 $bot->setWebhook();
                 $this->deleteConfig('webhook_set');
-                System_Daemon::warning("Switching to daemon mode from Webhook");
+                $this->warning("Switching to daemon mode from Webhook");
             }
 
             //Deamon mode
@@ -514,10 +514,10 @@ class Telebot
                         $this->count += $sleep;
                     }
                 } catch (HttpException $e) {
-                    System_Daemon::err("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
+                    $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                     $this->checkErrorsCount();
                 } catch (Exception $e) {
-                    System_Daemon::err("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
+                    $this->error("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                     $this->checkErrorsCount();
                 }
             }
@@ -539,14 +539,14 @@ class Telebot
         $fromName = $this->getFromName($message, true, true);
         $chatId = $this->getChatId();
         if ($update->getEditedMessage()) {
-            System_Daemon::info('[%s][SKIP] Skipping edited message %s from %s', $chatId,
+            $this->info('[%s][SKIP] Skipping edited message %s from %s', $chatId,
                 $update->getEditedMessage()->getText(), $fromName);
             return;
         }
         if (method_exists($this, 'addUser'))
             call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
         if ($inlineQuery = $update->getInlineQuery()) {
-            System_Daemon::info('[%s][OK] Received inline query %s from user %s', $chatId,
+            $this->info('[%s][OK] Received inline query %s from user %s', $chatId,
                 $inlineQuery->getQuery(), $fromName);
             if ($result = $this->handleInlineQuery($inlineQuery)) {
                 $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
@@ -554,7 +554,7 @@ class Telebot
         } elseif ($cbq = $update->getCallbackQuery()) {
             $replyForMessageId = $cbq->getMessage()->getMessageId();
             if ($callback = @$this->inlineAnswers[$chatId][$replyForMessageId]) {
-                System_Daemon::info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
+                $this->info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
                     $replyForMessageId, $cbq->getData(), $fromName);
                 if (is_string($callback) && method_exists($this, $callback))
                     $callback = [$this, $callback];
@@ -565,40 +565,40 @@ class Telebot
         } elseif (($message = $update->getMessage()) && is_object($message)) {
             if ($message->getText()) {
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    System_Daemon::info('[%s][OK] Received message %s from trusted user %s',
+                    $this->info('[%s][OK] Received message %s from trusted user %s',
                         $chatId, $message->getText(), $fromName);
                     $this->handle($update->getMessage());
                 } else {
-                    System_Daemon::info('[%s][SKIP] Skipping message %s from untrusted user %s',
+                    $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
                         $chatId, $message->getText(), $fromName);
                 }
             } else {
                 if ($message->getNewChatMember() && $message->getNewChatMember()->getId() == $this->getBotId()) {
-                    System_Daemon::info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onJoinChat();
                 } else if ($message->isGroupChatCreated()) {
-                    System_Daemon::info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onGroupChatCreated();
                 } else if ($message->isSupergroupChatCreated()) {
-                    System_Daemon::info('[%s][NEW] Bot has been invited to a new supergroup chat %s by %s',
+                    $this->info('[%s][NEW] Bot has been invited to a new supergroup chat %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onSuperGroupChatCreated();
                 } else if ($message->isChannelChatCreated()) {
-                    System_Daemon::info('[%s][NEW] Bot has been invited to a new channel %s by %s',
+                    $this->info('[%s][NEW] Bot has been invited to a new channel %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onChannelCreated();
                 } else if ($message->getNewChatPhoto()) {
-                    System_Daemon::info('[%s][INFO] New chat photo is set by %s',
+                    $this->info('[%s][INFO] New chat photo is set by %s',
                         $chatId, $fromName);
                 } else {
-                    System_Daemon::warning('[%s][WARN] Message with empty body: %s',
+                    $this->warning('[%s][WARN] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                 }
             }
         } else {
-            System_Daemon::err('[%s][ERROR] Cannot handle message. Update Info: %s',
+            $this->error('[%s][ERROR] Cannot handle message. Update Info: %s',
                 $update->getUpdateId(), json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
@@ -663,7 +663,7 @@ class Telebot
             $message = $this->getContext();
         }
         if (!$message) {
-            System_Daemon::warning('Cannot detect from name - unhandled message type %s', $this->update->toJson());
+            $this->warning('Cannot detect from name - unhandled message type %s', $this->update->toJson());
             return '';
         }
         $from = $message->getFrom();
@@ -712,7 +712,7 @@ class Telebot
      */
     protected function handleInlineQuery(InlineQuery $inlineQuery)
     {
-        System_Daemon::warning('Inline query handler not implemented');
+        $this->warning('Inline query handler not implemented');
         return false;
     }
 
@@ -791,10 +791,10 @@ class Telebot
         }
         if ($replyToId && $replyData = Dot::getValue($this->asks, "$chatId.$replyToId")) {
             //ReplyTo Message
-            System_Daemon::info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $message->getText());
+            $this->info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $message->getText());
             $replyText = trim($message->getText());
             if (!empty($replyData['answers']) && !$this->inDeepArray($replyData['answers'], $replyText) !== false) {
-                System_Daemon::warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
+                $this->warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
                 $replyToId = null;
             } else {
                 $callback = $replyData['callback'];
@@ -820,7 +820,7 @@ class Telebot
                 $commandName = $command . 'Command';
                 if (isset($this->commandAlias[$command])) $commandName = $this->commandAlias[$command];
                 if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName, $userId)) {
-                    System_Daemon::info('[RUN] Running %s with %s arguments', $commandName, count($commandParts));
+                    $this->info('[RUN] Running %s with %s arguments', $commandName, count($commandParts));
                     try {
                         call_user_func([$this, $commandName]);
                     } catch (\Exception $ex) {
@@ -831,7 +831,7 @@ class Telebot
                 foreach ($this->matches as $expression => $commandName) {
                     if (preg_match($expression, $command, $matches)) {
                         if ($this->commandExist($commandName)) {
-                            System_Daemon::info('[RUN] Running %s matched by %s', $commandName, $expression);
+                            $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
                             try {
                                 call_user_func_array([$this, $commandName], [$matches]);
                             } catch (\Exception $ex) {
@@ -905,26 +905,26 @@ class Telebot
             $user = $this->getUserId();
 
         if (!$user) {
-            System_Daemon::warning('[ACCESS][DENY] Deny Access for command %s - empty user', $methodName);
+            $this->warning('[ACCESS][DENY] Deny Access for command %s - empty user', $methodName);
             return false;
         }
 
         $method = new ReflectionMethod($this, $methodName);
         $doc = $method->getDocComment();
         if (strpos($doc, '@global-admin') !== false && !$this->isGlobalAdmin()) {
-            System_Daemon::warning('[ACCESS][DENY] Deny Access for command with global admin access level %s', $methodName);
+            $this->warning('[ACCESS][DENY] Deny Access for command with global admin access level %s', $methodName);
             return false;
         }
         if (strpos($doc, '@admin') !== false && !$this->isAdmin()) {
-            System_Daemon::warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
+            $this->warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
             return false;
         }
         if (strpos($doc, '@private') !== false && !$this->isChatPrivate()) {
-            System_Daemon::warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
+            $this->warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
             return false;
         }
         if (in_array($methodName, ['addCron', 'cron', 'run', 'handle', '__construct'])) {
-            System_Daemon::warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
+            $this->warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
             return false;
         }
         return true;
@@ -965,7 +965,7 @@ class Telebot
      */
     public function reply($text, $e = null, $replyKeyboardMarkup = null, $markdown = 'HTML')
     {
-        System_Daemon::info('[REPLY] %s', $text);
+        $this->info('[REPLY] %s', $text);
         $target = $this->getTarget($e);
         if (!$target)
             return;
@@ -1071,7 +1071,7 @@ class Telebot
                 $disableNotification
             );
         } catch (Exception $e) {
-            System_Daemon::err('Error sending photo %s - %s', $photo, $e->getMessage());
+            $this->error('Error sending photo %s - %s', $photo, $e->getMessage());
             return false;
         }
     }
@@ -1241,7 +1241,7 @@ class Telebot
         if (isset($this->cron[$type]) && is_array($this->cron[$type])) {
             foreach ($this->cron[$type] as $cronJob) {
                 if ($this->commandExist($cronJob)) {
-                    System_Daemon::info('[CRON][%s] Executing cron job %s', $type, $cronJob);
+                    $this->info('[CRON][%s] Executing cron job %s', $type, $cronJob);
                     call_user_func([$this, $cronJob]);
                 }
             }
@@ -1275,7 +1275,7 @@ class Telebot
             $this->telegram->editMessageText($target, $id, $text, $parse, $disablePreview, $markup);
         } catch (HttpException $e) {
             if (($e->getCode() == 400 && $e->getMessage() == 'Bad Request: message is not modified')) {
-                System_Daemon::info('Message %s was not modified', $id);
+                $this->info('Message %s was not modified', $id);
             } else {
                 throw $e;
             }
@@ -1302,7 +1302,7 @@ class Telebot
      */
     public function sendDocument($chatId = null, $file, $e = null)
     {
-        System_Daemon::info('[SEND_DOCUMENT] chat_id: %s, document: %s', $chatId, $file);
+        $this->info('[SEND_DOCUMENT] chat_id: %s, document: %s', $chatId, $file);
         if (!$e) $e = $this->e;
         $chatId = !is_null($chatId) ? $chatId : $e->getUserId();
         $file = new \CURLFile(realpath($file));
@@ -1325,7 +1325,7 @@ class Telebot
      */
     public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false)
     {
-        System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
+        $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
         if ($answers instanceof ReplyKeyboardMarkup) {
             $rm = $answers;
@@ -1342,7 +1342,7 @@ class Telebot
         if ($this->runMode == self::MODE_WEBHOOK && is_callable($callback)) {
             $error = 'Cannot use callable objects in webhook mode';
             $trace = @debug_backtrace();
-            System_Daemon::err($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
+            $this->error($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
             $this->sendErrorResponse($error, 601);
             return false;
         }
@@ -1438,7 +1438,7 @@ class Telebot
      */
     public function askInline($text, $answers = [], $callback = null)
     {
-        System_Daemon::info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''));
+        $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''));
         $e = $this->e;
         if (is_array($answers)) {
             $answers = new InlineKeyboardMarkup($answers);
@@ -1449,7 +1449,7 @@ class Telebot
         if ($this->runMode == self::MODE_WEBHOOK && is_callable($callback)) {
             $error = 'Cannot use callable objects in webhook mode';
             $trace = @debug_backtrace();
-            System_Daemon::err($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
+            $this->error($error . (isset($trace[1]['function']) ? " at {$trace[2]['function']}@{$trace[0]['file']}:{$trace[0]['line']}" : ''));
             $this->sendErrorResponse($error, 601);
             return false;
         }
@@ -1657,7 +1657,7 @@ class Telebot
     {
         if (!$e) $e = $this->e;
         if ($e) {
-            System_Daemon::debug('user is %s', $e->getUserId());
+            $this->debug('user is %s', $e->getUserId());
             return $e->getUserId();
         } else {
             return false;
