@@ -2,6 +2,8 @@
 
 namespace Prowebcraft\Telebot;
 
+use Monolog\ErrorHandler;
+use Monolog\Handler\LogEntriesHandler;
 use Monolog\Handler\LogglyHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
@@ -120,13 +122,6 @@ class Telebot
         //Create Logger
         $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
         $this->configLogger();
-        $this->logger->info('Bot is ready', [
-            'time' => time(),
-            'some_data' => [
-                'hey' => 1,
-                'yo' => 2
-            ]
-        ]);
 
         if ($this->getRunArg('write-initd')) {
             if (($initd_location = System_Daemon::writeAutoRun()) === false) {
@@ -146,6 +141,151 @@ class Telebot
 
     }
 
+
+    /**
+     * Log debug [100/6] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function debug($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::DEBUG);
+        }
+        return false;
+    }
+
+    /**
+     * Log info [200/5] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function info($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::INFO);
+        }
+        return false;
+    }
+
+    /**
+     * Log notice [250/5] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function notice($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::NOTICE);
+        }
+        return false;
+    }
+
+    /**
+     * Log warning [300/4] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function warning($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::WARNING);
+        }
+        return false;
+    }
+
+    /**
+     * Log error [400/3] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function error($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::ERROR);
+        }
+        return false;
+    }
+
+    /**
+     * Log critical [500/2] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function critical($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::CRITICAL);
+        }
+        return false;
+    }
+
+    /**
+     * Log alert [550/1] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function alert($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::ALERT);
+        }
+        return false;
+    }
+
+    /**
+     * Log emergency [600/0] message (sprintf style)
+     * @param string $format
+     * @param mixed $args [optional]
+     * @param mixed $_ [optional]
+     */
+    public function emergency($format, $args = null, $_ = null)
+    {
+        if (($message = $this->processLogBody(func_get_args()))) {
+            return $this->log($message, Logger::EMERGENCY);
+        }
+        return false;
+    }
+
+    /**
+     * Process params of log function
+     * @param $args
+     * @return null|string
+     */
+    private function processLogBody($args) {
+        if (empty($args)) return null;
+        if (count($args) == 1) {
+            $message = $args[0];
+        } else {
+            $text = array_shift($args);
+            $args = array_map(function ($v) {
+                if (is_array($v) || is_object($v)) return json_encode($v, JSON_UNESCAPED_UNICODE);
+                return $v;
+            }, $args);
+            $message = vsprintf($text, $args);
+        }
+        return $message;
+    }
+
+    /**
+     * Add a log entry
+     * @param $message
+     * @param int $level
+     * @param array $extra
+     * @return bool
+     */
+    protected function log($message, $level = Logger::INFO, $extra = [])
+    {
+        return $this->logger->log($level, $message, $extra);
+    }
+
     /**
      * Configure logger handlers and processors
      */
@@ -158,6 +298,10 @@ class Telebot
         if ($loggly = $this->getConfig('config.loggly_api_key')) {
             $this->logger->pushHandler(new LogglyHandler($loggly, Logger::INFO));
         }
+        if ($rapid = $this->getConfig('config.rapid_api_key')) {
+            $this->logger->pushHandler(new LogEntriesHandler($rapid, true, Logger::INFO));
+        }
+        ErrorHandler::register($this->logger);
     }
     
     /**
