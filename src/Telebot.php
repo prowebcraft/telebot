@@ -1773,7 +1773,7 @@ class Telebot
      * Check whenever bot run in console mode
      * @return bool
      */
-    protected function isConsoleMode()
+    public function isConsoleMode()
     {
         return php_sapi_name() == "cli";
     }
