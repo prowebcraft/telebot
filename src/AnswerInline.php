@@ -9,6 +9,7 @@
 
 namespace Prowebcraft\Telebot;
 
+use Prowebcraft\Dot;
 use TelegramBot\Api\Types\CallbackQuery;
 
 class AnswerInline
@@ -16,11 +17,13 @@ class AnswerInline
 
     protected $callbackQuery = null;
     protected $bot = null;
+    protected $payload = null;
 
-    public function __construct(CallbackQuery $query, Telebot $bot)
+    public function __construct(CallbackQuery $query, Telebot $bot, $payload)
     {
         $this->setCallbackQuery($query);
         $this->bot = $bot;
+        $this->payload = $payload;
     }
 
     /**
@@ -70,5 +73,16 @@ class AnswerInline
         $this->callbackQuery = $callbackQuery;
     }
 
+    /**
+     * Get extra data from payload
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function getExtraData($key, $default = null)
+    {
+        $extra = @$this->payload['extra'];
+        return Dot::getValue($extra, $key, $default);
+    }
 
 }

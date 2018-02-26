@@ -556,10 +556,16 @@ class Telebot
             if ($callback = @$this->inlineAnswers[$chatId][$replyForMessageId]) {
                 $this->info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
                     $replyForMessageId, $cbq->getData(), $fromName);
+                $payload = [];
+                if (is_array($callback) && isset($callback['callback'])) {
+                    //New Format
+                    $payload = $callback;
+                    $callback = $callback['callback'];
+                }
                 if (is_string($callback) && method_exists($this, $callback))
                     $callback = [$this, $callback];
                 if (is_callable($callback) || is_array($callback)) {
-                    call_user_func($callback, new AnswerInline($cbq, $this));
+                    call_user_func($callback, new AnswerInline($cbq, $this, $payload));
                 }
             }
         } elseif (($message = $update->getMessage()) && is_object($message)) {
@@ -1451,9 +1457,10 @@ class Telebot
      * Array of buttons
      * @param callable|array|null $callback
      * Callback method name (string preffered)
-     * @return Message
+     * @param array $extraData
+     * @return Message|false
      */
-    public function askInline($text, $answers = [], $callback = null)
+    public function askInline($text, $answers = [], $callback = null, $extraData = [])
     {
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''));
         $e = $this->e;
@@ -1470,13 +1477,26 @@ class Telebot
             $this->sendErrorResponse($error, 601);
             return false;
         }
-        $send = $this->telegram->sendMessage($this->getChatId(), $text, 'HTML', true, null, $answers);
-        if ($callback) {
-            $chatId = $this->getChatId();
-            Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $callback);
-            $this->saveReplies();
+        try {
+            $send = $this->telegram->sendMessage($this->getChatId(), $text, 'HTML', true, null, $answers);
+            if ($callback) {
+                $chatId = $this->getChatId();
+                $payload = [
+                    'id' => $send->getMessageId(),
+                    'time' => time(),
+                    'callback' => $callback,
+                    'owner' => $this->getUserId(),
+                    'extra' => $extraData
+                ];
+                Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $payload);
+                $this->saveReplies();
+            }
+            return $send;
+        } catch (Exception $e) {
+            $this->error("Error sending inline message: %s\nTrace: %s\n", $e->getMessage(), $e->getTraceAsString());
+            return false;
         }
-        return $send;
+
     }
 
 
