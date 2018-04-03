@@ -106,39 +106,11 @@ class Telebot
         unset($options[0]);
         System_Daemon::setOptions($options);
 
-        $this->db = $db = new Data([
-            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json'
-        ]);
-        $apiKey = $db->get('config.api');
-        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
-
-        //Restore Waiting Messages
-        $this->restoreReplies();
-
-        /** @var BotApi|Client $bot */
-        $bot = new Basic($db->get('config.api'));
-        $this->telegram = $bot;
-
-        //Create Logger
         $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
-        $this->configLogger();
-
-        if ($this->getRunArg('write-initd')) {
-            if (($initd_location = System_Daemon::writeAutoRun()) === false) {
-                $this->notice('unable to write init.d script');
-            } else {
-                $this->info(
-                    'sucessfully written startup script: %s',
-                    $initd_location
-                );
-            }
-            exit();
+        $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
+        if ($this->isConsoleMode()) {
+            $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
         }
-
-        if ($this->getRunArg('daemon')) {
-            System_Daemon::start();
-        }
-
     }
 
 
@@ -147,6 +119,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function debug($format, $args = null, $_ = null)
     {
@@ -161,6 +134,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function info($format, $args = null, $_ = null)
     {
@@ -175,6 +149,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function notice($format, $args = null, $_ = null)
     {
@@ -189,6 +164,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function warning($format, $args = null, $_ = null)
     {
@@ -203,6 +179,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function error($format, $args = null, $_ = null)
     {
@@ -217,6 +194,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function critical($format, $args = null, $_ = null)
     {
@@ -231,6 +209,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function alert($format, $args = null, $_ = null)
     {
@@ -245,6 +224,7 @@ class Telebot
      * @param string $format
      * @param mixed $args [optional]
      * @param mixed $_ [optional]
+     * @return bool
      */
     public function emergency($format, $args = null, $_ = null)
     {
@@ -291,10 +271,6 @@ class Telebot
      */
     protected function configLogger()
     {
-        $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
-        if ($this->isConsoleMode()) {
-            $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
-        }
         if ($loggly = $this->getConfig('config.loggly_api_key')) {
             $this->logger->pushHandler(new LogglyHandler($loggly, Logger::INFO));
         }
@@ -428,8 +404,14 @@ class Telebot
         return $this->getBotInfo('id');
     }
 
+    /**
+     * Run bot in webhook mode
+     * @throws Exception
+     * @throws \TelegramBot\Api\Exception
+     */
     public function webhook()
     {
+        $this->init();
         //Check if webhook was set
         if ($this->isConsoleMode()) {
 
@@ -483,9 +465,11 @@ class Telebot
 
     /**
      * Starts the bot
+     * @throws Exception
      */
     public function start()
     {
+        $this->init();
         $bot = $this->telegram;
         $this->beforeStart();
 
@@ -1785,6 +1769,45 @@ class Telebot
     {
         $runtimeDir = getcwd() . DIRECTORY_SEPARATOR . 'runtime';
         return $runtimeDir;
+    }
+
+    /**
+     * Perform init (load database, restore replies, config loggers etc)
+     * @throws Exception
+     */
+    protected function init()
+    {
+        $this->db = $db = new Data([
+            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json'
+        ]);
+        $apiKey = $db->get('config.api');
+        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
+
+        //Restore Waiting Messages
+        $this->restoreReplies();
+
+        /** @var BotApi|Client $bot */
+        $bot = new Basic($db->get('config.api'));
+        $this->telegram = $bot;
+
+        //Create Logger
+        $this->configLogger();
+
+        if ($this->getRunArg('write-initd')) {
+            if (($initd_location = System_Daemon::writeAutoRun()) === false) {
+                $this->notice('unable to write init.d script');
+            } else {
+                $this->info(
+                    'sucessfully written startup script: %s',
+                    $initd_location
+                );
+            }
+            exit();
+        }
+
+        if ($this->getRunArg('daemon')) {
+            System_Daemon::start();
+        }
     }
 
 }
