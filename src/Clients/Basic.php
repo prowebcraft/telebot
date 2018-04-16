@@ -30,7 +30,7 @@ class Basic extends BotApi
      */
     public function __construct($token, $trackerToken = null, $proxy = null)
     {
-        $this->proxy = $apiUrl;
+        $this->proxy = $proxy;
         parent::__construct($token, $trackerToken);
     }
 
