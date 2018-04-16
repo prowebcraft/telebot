@@ -475,9 +475,8 @@ class Telebot
 
         if ($this->isConsoleMode()) {
             if ($this->getConfig('webhook_set')) {
-                $bot->setWebhook();
-                $this->deleteConfig('webhook_set');
                 $this->warning("Switching to daemon mode from Webhook");
+                $this->disableWebhook();
             }
 
             //Deamon mode
@@ -498,8 +497,13 @@ class Telebot
                         $this->count += $sleep;
                     }
                 } catch (HttpException $e) {
-                    $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
-                    $this->checkErrorsCount();
+                    if ($e->getCode() == 409) {
+                        $this->warning('Webhook was set. Switched to console mode');
+                        $this->disableWebhook();
+                    } else {
+                        $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
+                        $this->checkErrorsCount();
+                    }
                 } catch (Exception $e) {
                     $this->error("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                     $this->checkErrorsCount();
@@ -1828,6 +1832,15 @@ class Telebot
         if ($this->getRunArg('daemon')) {
             System_Daemon::start();
         }
+    }
+
+    /**
+     * @param $bot
+     */
+    protected function disableWebhook()
+    {
+        $this->telegram->setWebhook();
+        $this->deleteConfig('webhook_set');
     }
 
 }
