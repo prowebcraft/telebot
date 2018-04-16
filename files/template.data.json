@@ -1,11 +1,9 @@
 {
   "config": {
     "api": "TELEGRAM_BOT_API_KEY",
-    "globalAdmin": 70863438,
-    "admins": [
-      70863438,
-      86075448
-    ],
+    "owner": null,
+    "admins": [],
+    "protect": false,
     "trust": [],
     "whiteGroups": []
   }

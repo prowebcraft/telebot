@@ -18,16 +18,29 @@ use TelegramBot\Api\Exception;
  */
 class Basic extends BotApi
 {
+
+    protected $proxy = null;
+
     /**
      * Client constructor
      *
      * @param string $token Telegram Bot API token
      * @param string|null $trackerToken Yandex AppMetrica application api_key
+     * @param string|null $proxy Custom api proxy entrance, such as https://your.host/bot
      */
-    public function __construct($token, $trackerToken = null)
+    public function __construct($token, $trackerToken = null, $proxy = null)
     {
+        $this->proxy = $apiUrl;
         parent::__construct($token, $trackerToken);
     }
+
+    public function getUrl()
+    {
+        if ($this->proxy)
+            return $this->proxy . $this->token;
+        return parent::getUrl();
+    }
+
 
     /**
      * Call method

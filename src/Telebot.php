@@ -527,6 +527,14 @@ class Telebot
                 $update->getEditedMessage()->getText(), $fromName);
             return;
         }
+        if (empty($this->getConfig('owner'))) {
+            if (!($ownerId = $this->getConfig('config.globalAdmin'))) {
+                $ownerId = $this->getUserId();
+                $this->warning('[OWNER] Greeting new bot owner - %s', $fromName);
+            }
+            $this->setConfig('config.owner', $ownerId);
+            $this->deleteConfig('config.globalAdmin');
+        }
         if (method_exists($this, 'addUser'))
             call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
         if ($inlineQuery = $update->getInlineQuery()) {
@@ -671,6 +679,8 @@ class Telebot
     protected function getContext()
     {
         $message = null;
+        if (!$this->update)
+            return null;
         if ($this->update->getInlineQuery()) {
             $message = $this->update->getInlineQuery();
         } else if ($this->update->getCallbackQuery()) {
@@ -922,6 +932,16 @@ class Telebot
 
     /**
      * Check if current user has global admin or chat owner privelleges
+     * Alias for isGlobalAdmin
+     * @return bool
+     */
+    protected function isOwner()
+    {
+        return $this->isGlobalAdmin();
+    }
+
+    /**
+     * Check if current user has global admin or chat owner privelleges
      * @return bool
      */
     protected function isGlobalAdmin()
@@ -930,7 +950,7 @@ class Telebot
         $userId = $this->getUserId();
         if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId)
             return true;
-        return $userId == $this->getConfig('config.globalAdmin');
+        return $userId == $this->getConfig('config.owner');
     }
     
     /**
@@ -1787,7 +1807,7 @@ class Telebot
         $this->restoreReplies();
 
         /** @var BotApi|Client $bot */
-        $bot = new Basic($db->get('config.api'));
+        $bot = new Basic($this->getConfig('config.api'), null, $this->getConfig('config.proxy'));
         $this->telegram = $bot;
 
         //Create Logger
