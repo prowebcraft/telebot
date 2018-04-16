@@ -527,7 +527,7 @@ class Telebot
                 $update->getEditedMessage()->getText(), $fromName);
             return;
         }
-        if (empty($this->getConfig('owner'))) {
+        if (empty($this->getConfig('config.owner'))) {
             if (!($ownerId = $this->getConfig('config.globalAdmin'))) {
                 $ownerId = $this->getUserId();
                 $this->warning('[OWNER] Greeting new bot owner - %s', $fromName);
