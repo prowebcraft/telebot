@@ -503,6 +503,7 @@ class Telebot
                     } else {
                         $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                         $this->checkErrorsCount();
+                        sleep(5);
                     }
                 } catch (Exception $e) {
                     $this->error("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
@@ -1188,7 +1189,9 @@ class Telebot
     protected function getMessageId()
     {
         if ($context = $this->getContext()) {
-            if (method_exists($context, 'getMessage') && $context->getMessage()) {
+            if (method_exists($context, 'getMessageId') && $context->getMessageId()) {
+                return $context->getMessageId();
+            } else if (method_exists($context, 'getMessage') && $context->getMessage()) {
                 return $context->getMessage()->getMessageId();
             }
         }
@@ -1353,7 +1356,7 @@ class Telebot
      * Some extra data to pass with payload
      * @return Message
      */
-    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [])
+    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [], $replyToMessageId = null)
     {
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
@@ -1367,7 +1370,13 @@ class Telebot
             $rm = new ForceReply(true, false);
             $useReplyMarkup = true;
         }
+        if ($useReplyMarkup) {
+            $rm->setSelective(true);
+        }
         if ($multiple) $rm->setOneTimeKeyboard(false);
+        if ($replyToMessageId === null && (!empty($answers) || $useReplyMarkup)) {
+            $replyToMessageId = $this->getMessageId();
+        }
 
         if ($this->runMode == self::MODE_WEBHOOK && is_callable($callback)) {
             $error = 'Cannot use callable objects in webhook mode';
@@ -1377,7 +1386,7 @@ class Telebot
             return false;
         }
 
-        $send = $this->sendMessage($this->getChatId(), $text, 'HTML', true, !empty($answers) || $useReplyMarkup ? $this->getMessageId() : null, $rm);
+        $send = $this->sendMessage($this->getChatId(), $text, 'HTML', true, $replyToMessageId, $rm);
         $this->addWaitingReply($send->getMessageId(), $text, $answers, $callback, $multiple, $extraData);
         return $send;
     }
