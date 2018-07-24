@@ -818,6 +818,18 @@ class Telebot
 
         }
         if (!$replyToId) {
+            foreach ($this->matches as $expression => $commandName) {
+                if (preg_match($expression, $command, $matches)) {
+                    if ($this->commandExist($commandName)) {
+                        $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
+                        try {
+                            call_user_func_array([$this, $commandName], [$matches]);
+                        } catch (\Exception $ex) {
+                            $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
+                        }
+                    }
+                }
+            }
             if ($command[0] == "/") {
                 $command = mb_substr(array_shift($commandParts), 1);
                 if (($atPos = mb_stripos($command, '@'))) $command = mb_substr($command, 0, $atPos);
@@ -830,19 +842,6 @@ class Telebot
                         call_user_func([$this, $commandName]);
                     } catch (\Exception $ex) {
                         $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
-                    }
-                }
-            } else {
-                foreach ($this->matches as $expression => $commandName) {
-                    if (preg_match($expression, $command, $matches)) {
-                        if ($this->commandExist($commandName)) {
-                            $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
-                            try {
-                                call_user_func_array([$this, $commandName], [$matches]);
-                            } catch (\Exception $ex) {
-                                $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
-                            }
-                        }
                     }
                 }
             }
