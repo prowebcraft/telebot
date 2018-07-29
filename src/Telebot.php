@@ -950,7 +950,6 @@ class Telebot
      */
     protected function isGlobalAdmin()
     {
-        if (!$this->e) return false;
         $userId = $this->getUserId();
         if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId)
             return true;
@@ -963,7 +962,6 @@ class Telebot
      */
     protected function isAdmin()
     {
-        if (!$this->e) return false;
         if ($this->isGlobalAdmin())
             return true;
         $admins = array_merge($this->getConfig('config.admins', []), $this->getChatConfig('admins', []));
@@ -1372,7 +1370,7 @@ class Telebot
         if ($useReplyMarkup) {
             $rm->setSelective(true);
         }
-        if ($multiple) $rm->setOneTimeKeyboard(false);
+        if ($multiple && !($rm instanceof ForceReply)) $rm->setOneTimeKeyboard(false);
         if ($replyToMessageId === null && (!empty($answers) || $useReplyMarkup)) {
             $replyToMessageId = $this->getMessageId();
         }
