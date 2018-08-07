@@ -967,7 +967,7 @@ class Telebot
         $admins = array_merge($this->getConfig('config.admins', []), $this->getChatConfig('admins', []));
         return in_array($this->getUserId(), $admins);
     }
-    
+
     /**
      * Reply to user or chat
      * @param $text
@@ -975,24 +975,35 @@ class Telebot
      * @param null|ReplyKeyboardMarkup|ForceReply|InlineKeyboardMarkup $markup
      * @return Message|false
      */
-    public function reply($text, $e = null, $replyKeyboardMarkup = null, $markdown = 'HTML')
+    public function reply($text, $e = null, $replyKeyboardMarkup = null, $format = 'HTML', $replyToMessageId = null)
     {
         $this->info('[REPLY] %s', $text);
         $target = $this->getTarget($e);
         if (!$target)
             return;
-        return $this->sendMessage($target, $text, $markdown, false, null, $replyKeyboardMarkup);
+        return $this->sendMessage($target, $text, $format, false, $replyToMessageId, $replyKeyboardMarkup);
+    }
+
+    /**
+     * Reply to chat message
+     * @param $text
+     * @param null $markup
+     * @param string $format
+     */
+    public function replyToMessage($text, $message, $markup = null, $format = 'HTML')
+    {
+        return $this->reply($text, null, $markup, $format, $message);
     }
 
     /**
      * Reply to last chat message
      * @param $text
      * @param null $markup
-     * @param string $markdown
+     * @param string $format
      */
-    public function replyToLastMessage($text, $replyKeyboardMarkup = null, $markdown = 'HTML')
+    public function replyToLastMessage($text, $markup = null, $format = 'HTML')
     {
-        return $this->reply($text, null, $replyKeyboardMarkup, $markdown);
+        return $this->reply($text, null, $markup, $format);
     }
 
     /**
@@ -1353,7 +1364,7 @@ class Telebot
      * Some extra data to pass with payload
      * @return Message
      */
-    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [], $replyToMessageId = null)
+    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [], $replyToMessageId = null, $selective = false)
     {
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
@@ -1364,10 +1375,10 @@ class Telebot
             if (!empty($answers) && is_array($answers) && !is_array($answers[0])) $answers = [$answers];
             $rm = new ReplyKeyboardMarkup($answers, true, true, true);
         } else {
-            $rm = new ForceReply(true, false);
+            $rm = new ForceReply(true, $selective);
             $useReplyMarkup = true;
         }
-        if ($useReplyMarkup) {
+        if ($selective) {
             $rm->setSelective(true);
         }
         if ($multiple && !($rm instanceof ForceReply)) $rm->setOneTimeKeyboard(false);
