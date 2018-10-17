@@ -25,7 +25,7 @@ trait Names
     protected function addUser($id, $name)
     {
         if (!$this->getUserName($id)) {
-            \System_Daemon::info('Adding new user to registry - %s with id %s', $name, $id);
+            $this->info('Adding new user to registry - %s with id %s', $name, $id);
             $this->setUserName($id, $name);
         }
     }

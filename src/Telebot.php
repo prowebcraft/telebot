@@ -17,7 +17,6 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use System_Daemon;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
@@ -103,8 +102,6 @@ class Telebot
             'sysMemoryLimit' => '1024M',
             'logLocation' => $runtimeDir . DIRECTORY_SEPARATOR . 'bot.log'
         , $options));
-        unset($options[0]);
-        System_Daemon::setOptions($options);
 
         $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
         $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
@@ -480,7 +477,7 @@ class Telebot
             }
 
             //Deamon mode
-            while (!System_Daemon::isDying() && $this->run) {
+            while ($this->run) {
                 try {
                     $start = microtime(true);
                     $updates = $bot->getUpdates($this->lastUpdateId);
@@ -493,7 +490,7 @@ class Telebot
                     $this->count += $processingTime;
 
                     if ($sleep > 0) {
-                        System_Daemon::iterate($sleep);
+                        $this->iterate($sleep);
                         $this->count += $sleep;
                     }
                 } catch (HttpException $e) {
@@ -510,11 +507,40 @@ class Telebot
                     $this->checkErrorsCount();
                 }
             }
-            System_Daemon::stop();
+            $this->info('Bot is stopping');
         } else {
             echo 'This method need to be run under console ' . PHP_EOL;
             exit();
         }
+    }
+
+    /**
+     * Protects daemon by clearing statcache. Can optionally
+     * be used as a replacement for sleep as well.
+     *
+     * @param integer $sleepSeconds
+     * Optionally put your daemon to rest for X s.
+     *
+     * @return bool
+     * @see start()
+     * @see stop()
+     */
+    protected function iterate($sleepSeconds = 0)
+    {
+        if ($sleepSeconds >= 1) {
+            sleep($sleepSeconds);
+        } else if (is_numeric($sleepSeconds)) {
+            usleep($sleepSeconds * 1000000);
+        }
+
+        clearstatcache();
+
+        // Garbage Collection (PHP >= 5.3)
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
+        }
+
+        return true;
     }
 
     /**
@@ -1833,22 +1859,6 @@ class Telebot
 
         //Create Logger
         $this->configLogger();
-
-        if ($this->getRunArg('write-initd')) {
-            if (($initd_location = System_Daemon::writeAutoRun()) === false) {
-                $this->notice('unable to write init.d script');
-            } else {
-                $this->info(
-                    'sucessfully written startup script: %s',
-                    $initd_location
-                );
-            }
-            exit();
-        }
-
-        if ($this->getRunArg('daemon')) {
-            System_Daemon::start();
-        }
     }
 
     /**
