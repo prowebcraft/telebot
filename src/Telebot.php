@@ -53,11 +53,7 @@ class Telebot
     public $currentErrors = 0;
     public $count = 1;
     public $stepDelay = 3;
-    protected $runParams = [
-        'daemon' => false,
-        'help' => false,
-        'write-initd' => false,
-    ];
+    protected $runParams = [];
     /** @var Data|null */
     protected $db = null;
     /** @var Event $e Last Event */
@@ -70,38 +66,43 @@ class Telebot
     protected $inlineAnswers = [];
     private $lastUpdateId = null;
     protected $runMode = self::MODE_DEAMON;
-
+    protected $options = [];
     protected $logger = null;
 
+    /**
+     * Telebot constructor.
+     * @param string $appName
+     * Your bot name
+     * @param string $description
+     * @param string $author
+     * @param string $email
+     * @param array $options
+     * @throws Exception
+     */
     public function __construct($appName, $description = null, $author = null, $email = null, $options = [])
     {
-        if ($this->getRunArg('help')) {
-            echo 'Usage: ' . $_SERVER['argv'][0] . ' [runmode]' . "\n";
-            echo 'Available runtime options:' . "\n";
-            foreach ($this->getRunArg() as $runmod => $val) {
-                echo ' --' . $runmod . "\n";
-            }
-            die();
-        }
         ini_set("default_charset", "UTF-8");
 
-        $runtimeDir = $this->getRuntimeDirectory();
-
-        if (!file_exists($runtimeDir))
-            mkdir($runtimeDir, 0777, true);
-
         $this->fallbackSignalConstRegister();
-        $options = array_merge(array(
+        $options = array_merge([
             'appName' => $appName,
             'appDescription' => $description,
             'authorName' => $author,
             'authorEmail' => $email,
             'appDir' => realpath(__DIR__ . '/..'),
-            'sysMaxExecutionTime' => '0',
-            'sysMaxInputTime' => '0',
-            'sysMemoryLimit' => '1024M',
-            'logLocation' => $runtimeDir . DIRECTORY_SEPARATOR . 'bot.log'
-        , $options));
+            'runtimeDir' => getcwd() . DIRECTORY_SEPARATOR . 'runtime',
+            'logFile' => null,
+            'dataFile' => null
+        ], $options);
+        $this->setOptions($options);
+        $runtimeDir = $this->getOption('runtimeDir');
+        if (!file_exists($runtimeDir))
+            mkdir($runtimeDir, 0777, true);
+
+        if (!$this->getOption('logFile'))
+            $this->setOption('logFile', $runtimeDir . DIRECTORY_SEPARATOR . 'bot.log');
+        if (!$this->getOption('dataFile'))
+            $this->setOption('dataFile', $runtimeDir . DIRECTORY_SEPARATOR . 'data.json');
 
         $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
         $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
@@ -110,6 +111,157 @@ class Telebot
         }
     }
 
+    /**
+     * Protects daemon by clearing statcache. Can optionally
+     * be used as a replacement for sleep as well.
+     *
+     * @param integer $sleepSeconds
+     * Optionally put your daemon to rest for X s.
+     *
+     * @return bool
+     * @see start()
+     * @see stop()
+     */
+    protected function iterate($sleepSeconds = 0)
+    {
+        if ($sleepSeconds >= 1) {
+            sleep($sleepSeconds);
+        } else if (is_numeric($sleepSeconds)) {
+            usleep($sleepSeconds * 1000000);
+        }
+
+        clearstatcache();
+
+        // Garbage Collection (PHP >= 5.3)
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
+        }
+
+        return true;
+    }
+
+    /**
+     * Handle Update Message
+     * @param Update $update
+     */
+    public function handleUpdate($update)
+    {
+        $this->update = $update;
+        $message = $update->getMessage();
+        $fromName = $this->getFromName($message, true, true);
+        $chatId = $this->getChatId();
+        if ($update->getEditedMessage()) {
+            $this->info('[%s][SKIP] Skipping edited message %s from %s', $chatId,
+                $update->getEditedMessage()->getText(), $fromName);
+            return;
+        }
+        if (empty($this->getConfig('config.owner'))) {
+            if (!($ownerId = $this->getConfig('config.globalAdmin'))) {
+                $ownerId = $this->getUserId();
+                $this->warning('[OWNER] Greeting new bot owner - %s', $fromName);
+            }
+            $this->setConfig('config.owner', $ownerId);
+            $this->deleteConfig('config.globalAdmin');
+        }
+        if (method_exists($this, 'addUser'))
+            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
+        if ($inlineQuery = $update->getInlineQuery()) {
+            $this->info('[%s][OK] Received inline query %s from user %s', $chatId,
+                $inlineQuery->getQuery(), $fromName);
+            if ($result = $this->handleInlineQuery($inlineQuery)) {
+                $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
+            }
+        } elseif ($cbq = $update->getCallbackQuery()) {
+            $replyForMessageId = $cbq->getMessage()->getMessageId();
+            if ($callback = @$this->inlineAnswers[$chatId][$replyForMessageId]) {
+                $this->info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
+                    $replyForMessageId, $cbq->getData(), $fromName);
+                $payload = [];
+                if (is_array($callback) && isset($callback['callback'])) {
+                    //New Format
+                    $payload = $callback;
+                    $callback = $callback['callback'];
+                }
+                if (is_string($callback) && method_exists($this, $callback))
+                    $callback = [$this, $callback];
+                if (is_callable($callback) || is_array($callback)) {
+                    call_user_func($callback, new AnswerInline($cbq, $this, $payload));
+                }
+            }
+        } elseif (($message = $update->getMessage()) && is_object($message)) {
+            if ($message->getText()) {
+                if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
+                    $this->info('[%s][OK] Received message %s from trusted user %s',
+                        $chatId, $message->getText(), $fromName);
+                    $this->handle($update->getMessage());
+                } else {
+                    $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
+                        $chatId, $message->getText(), $fromName);
+                }
+            } else {
+                if ($message->getNewChatMember() && $message->getNewChatMember()->getId() == $this->getBotId()) {
+                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onJoinChat();
+                } else if ($message->isGroupChatCreated()) {
+                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onGroupChatCreated();
+                } else if ($message->isSupergroupChatCreated()) {
+                    $this->info('[%s][NEW] Bot has been invited to a new supergroup chat %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onSuperGroupChatCreated();
+                } else if ($message->isChannelChatCreated()) {
+                    $this->info('[%s][NEW] Bot has been invited to a new channel %s by %s',
+                        $chatId, $message->getChat()->getTitle(), $fromName);
+                    $this->onChannelCreated();
+                } else if ($message->getNewChatPhoto()) {
+                    $this->info('[%s][INFO] New chat photo is set by %s',
+                        $chatId, $fromName);
+                } else {
+                    $this->warning('[%s][WARN] Message with empty body: %s',
+                        $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                }
+            }
+        } else {
+            $this->error('[%s][ERROR] Cannot handle message. Update Info: %s',
+                $update->getUpdateId(), json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+    }
+
+    /**
+     * Get option
+     * @param string $key
+     * @param mixed $default
+     * @return mixed|null
+     */
+    public function getOption($key, $default = null)
+    {
+        return isset($this->options[$key]) ? $this->options[$key] : $default;
+    }
+
+    /**
+     * Set all options
+     * @param array $options
+     * @return $this
+     */
+    public function setOptions($options)
+    {
+        $this->options = $options;
+        return $this;
+    }
+
+    /**
+     * Set option
+     * @param $key
+     * @param $value
+     * @return $this
+     */
+    public function setOption($key, $value)
+    {
+        $this->options[$key] = $value;
+        return $this;
+    }
 
     /**
      * Log debug [100/6] message (sprintf style)
@@ -511,124 +663,6 @@ class Telebot
         } else {
             echo 'This method need to be run under console ' . PHP_EOL;
             exit();
-        }
-    }
-
-    /**
-     * Protects daemon by clearing statcache. Can optionally
-     * be used as a replacement for sleep as well.
-     *
-     * @param integer $sleepSeconds
-     * Optionally put your daemon to rest for X s.
-     *
-     * @return bool
-     * @see start()
-     * @see stop()
-     */
-    protected function iterate($sleepSeconds = 0)
-    {
-        if ($sleepSeconds >= 1) {
-            sleep($sleepSeconds);
-        } else if (is_numeric($sleepSeconds)) {
-            usleep($sleepSeconds * 1000000);
-        }
-
-        clearstatcache();
-
-        // Garbage Collection (PHP >= 5.3)
-        if (function_exists('gc_collect_cycles')) {
-            gc_collect_cycles();
-        }
-
-        return true;
-    }
-
-    /**
-     * Handle Update Message
-     * @param Update $update
-     */
-    public function handleUpdate($update)
-    {
-        $this->update = $update;
-        $message = $update->getMessage();
-        $fromName = $this->getFromName($message, true, true);
-        $chatId = $this->getChatId();
-        if ($update->getEditedMessage()) {
-            $this->info('[%s][SKIP] Skipping edited message %s from %s', $chatId,
-                $update->getEditedMessage()->getText(), $fromName);
-            return;
-        }
-        if (empty($this->getConfig('config.owner'))) {
-            if (!($ownerId = $this->getConfig('config.globalAdmin'))) {
-                $ownerId = $this->getUserId();
-                $this->warning('[OWNER] Greeting new bot owner - %s', $fromName);
-            }
-            $this->setConfig('config.owner', $ownerId);
-            $this->deleteConfig('config.globalAdmin');
-        }
-        if (method_exists($this, 'addUser'))
-            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
-        if ($inlineQuery = $update->getInlineQuery()) {
-            $this->info('[%s][OK] Received inline query %s from user %s', $chatId,
-                $inlineQuery->getQuery(), $fromName);
-            if ($result = $this->handleInlineQuery($inlineQuery)) {
-                $this->telegram->answerInlineQuery($inlineQuery->getId(), $result);
-            }
-        } elseif ($cbq = $update->getCallbackQuery()) {
-            $replyForMessageId = $cbq->getMessage()->getMessageId();
-            if ($callback = @$this->inlineAnswers[$chatId][$replyForMessageId]) {
-                $this->info('[%s][OK] Received inline answer for message %s with data %s from user %s', $chatId,
-                    $replyForMessageId, $cbq->getData(), $fromName);
-                $payload = [];
-                if (is_array($callback) && isset($callback['callback'])) {
-                    //New Format
-                    $payload = $callback;
-                    $callback = $callback['callback'];
-                }
-                if (is_string($callback) && method_exists($this, $callback))
-                    $callback = [$this, $callback];
-                if (is_callable($callback) || is_array($callback)) {
-                    call_user_func($callback, new AnswerInline($cbq, $this, $payload));
-                }
-            }
-        } elseif (($message = $update->getMessage()) && is_object($message)) {
-            if ($message->getText()) {
-                if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    $this->info('[%s][OK] Received message %s from trusted user %s',
-                        $chatId, $message->getText(), $fromName);
-                    $this->handle($update->getMessage());
-                } else {
-                    $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
-                        $chatId, $message->getText(), $fromName);
-                }
-            } else {
-                if ($message->getNewChatMember() && $message->getNewChatMember()->getId() == $this->getBotId()) {
-                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
-                        $chatId, $message->getChat()->getTitle(), $fromName);
-                    $this->onJoinChat();
-                } else if ($message->isGroupChatCreated()) {
-                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
-                        $chatId, $message->getChat()->getTitle(), $fromName);
-                    $this->onGroupChatCreated();
-                } else if ($message->isSupergroupChatCreated()) {
-                    $this->info('[%s][NEW] Bot has been invited to a new supergroup chat %s by %s',
-                        $chatId, $message->getChat()->getTitle(), $fromName);
-                    $this->onSuperGroupChatCreated();
-                } else if ($message->isChannelChatCreated()) {
-                    $this->info('[%s][NEW] Bot has been invited to a new channel %s by %s',
-                        $chatId, $message->getChat()->getTitle(), $fromName);
-                    $this->onChannelCreated();
-                } else if ($message->getNewChatPhoto()) {
-                    $this->info('[%s][INFO] New chat photo is set by %s',
-                        $chatId, $fromName);
-                } else {
-                    $this->warning('[%s][WARN] Message with empty body: %s',
-                        $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                }
-            }
-        } else {
-            $this->error('[%s][ERROR] Cannot handle message. Update Info: %s',
-                $update->getUpdateId(), json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
 
@@ -1834,8 +1868,7 @@ class Telebot
      */
     protected function getRuntimeDirectory()
     {
-        $runtimeDir = getcwd() . DIRECTORY_SEPARATOR . 'runtime';
-        return $runtimeDir;
+        return $this->getOption('runtimeDir');
     }
 
     /**
@@ -1845,7 +1878,8 @@ class Telebot
     protected function init()
     {
         $this->db = $db = new Data([
-            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json'
+            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json',
+            'dir' => $this->getRuntimeDirectory()
         ]);
         $apiKey = $db->get('config.api');
         if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
