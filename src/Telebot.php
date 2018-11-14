@@ -557,6 +557,7 @@ class Telebot
      * Set webhook url and turn on webhook mode
      * @param $url
      * @throws \TelegramBot\Api\Exception
+     * @return array
      */
     public function setWebhook($url)
     {
@@ -564,6 +565,7 @@ class Telebot
         $reply = $this->telegram->setWebhook($url);
         $this->setConfig('webhook', $url, false);
         $this->setConfig('webhook_set', time());
+        return $reply;
     }
 
     /**
