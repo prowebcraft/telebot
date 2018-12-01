@@ -89,11 +89,13 @@ class Telebot
             'appDescription' => $description,
             'authorName' => $author,
             'authorEmail' => $email,
-            'appDir' => realpath(__DIR__ . '/..'),
-            'runtimeDir' => getcwd() . DIRECTORY_SEPARATOR . 'runtime',
+            'appDir' => realpath(dirname(__FILE__) . '/../../../..'),
+            'runtimeDir' => null,
             'logFile' => null,
             'dataFile' => null
         ], $options);
+        if ($options['runtimeDir'] === null)
+            $options['runtimeDir'] = $options['appDir'] . DIRECTORY_SEPARATOR . 'runtime';
         $this->setOptions($options);
         $runtimeDir = $this->getOption('runtimeDir');
         if (!file_exists($runtimeDir))
@@ -1901,6 +1903,16 @@ class Telebot
     }
 
     /**
+     * Get location for storing data.json file
+     * @return string|null
+     */
+    protected function getDataDirectory()
+    {
+        return $this->getOption('appDir');
+    }
+
+    /**
+     * Get Runtime directory location for storing logs etc
      * @return string
      */
     protected function getRuntimeDirectory()
@@ -1916,7 +1928,7 @@ class Telebot
     {
         $this->db = $db = new Data([
             'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json',
-            'dir' => $this->getRuntimeDirectory()
+            'dir' => $this->getDataDirectory()
         ]);
         $apiKey = $db->get('config.api');
         if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
