@@ -163,8 +163,10 @@ class Telebot
             $this->setConfig('config.owner', $ownerId);
             $this->deleteConfig('config.globalAdmin');
         }
-        if (method_exists($this, 'addUser'))
-            call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
+        if (!$this->isChannel()) {
+            if (method_exists($this, 'addUser'))
+                call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
+        }
         if ($inlineQuery = $update->getInlineQuery()) {
             $this->info('[%s][OK] Received inline query %s from user %s', $chatId,
                 $inlineQuery->getQuery(), $fromName);
@@ -188,12 +190,12 @@ class Telebot
                     call_user_func($callback, new AnswerInline($cbq, $this, $payload));
                 }
             }
-        } elseif (($message = $update->getMessage()) && is_object($message)) {
+        } elseif ((($message = $update->getMessage()) || ($this->isChannel() && ($message = $update->getChannelPost()))) && is_object($message)) {
             if ($message->getText()) {
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    $this->info('[%s][OK] Received message %s from trusted user %s',
+                    $this->info('[%s][OK] Received message %s from %s',
                         $chatId, $message->getText(), $fromName);
-                    $this->handle($update->getMessage());
+                    $this->handle($message);
                 } else {
                     $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
                         $chatId, $message->getText(), $fromName);
@@ -426,6 +428,21 @@ class Telebot
         if ($rapid = $this->getConfig('config.rapid_api_key')) {
             $this->logger->pushHandler(new LogEntriesHandler($rapid, true, Logger::INFO));
         }
+        if ($sentry = $this->getConfig('config.sentry_client_endpoint')) {
+            if (!class_exists('Raven_Client'))
+                throw new \InvalidArgumentException('sentry client is not installed, please run composer require "sentry/sentry"');
+            $client = new \Raven_Client($sentry);
+            $handler = new \Monolog\Handler\RavenHandler($client);
+            $handler->setFormatter(new \Monolog\Formatter\LineFormatter("%message% %context% %extra%\n"));
+            $this->logger->pushHandler($handler);
+        }
+        //Adding Some Context
+        $this->logger->pushProcessor(function ($record) {
+            if ($this->update && is_object($this->update) && method_exists($this->update, 'toJson')) {
+                $record['extra']['update'] = json_decode($this->update->toJson(), true);
+            }
+            return $record;
+        });
         ErrorHandler::register($this->logger);
     }
     
@@ -742,11 +759,16 @@ class Telebot
             $this->warning('Cannot detect from name - unhandled message type %s', $this->update->toJson());
             return '';
         }
-        $from = $message->getFrom();
-        $fromName = $from->getFirstName()
-            . ($from->getLastName() ? ' ' . $from->getLastName() : '');
-        if ($username) $fromName .= ($from->getUsername() ? ' @' . $from->getUsername() : '');
-        if ($id) $fromName .= ' (' . $from->getId() . ')';
+        if ($this->isChannel()) {
+            $fromName = 'channel ' . $message->getChat()->getTitle();
+        } else {
+            $from = $message->getFrom();
+            $fromName = $from->getFirstName()
+                . ($from->getLastName() ? ' ' . $from->getLastName() : '');
+            if ($username) $fromName .= ($from->getUsername() ? ' @' . $from->getUsername() : '');
+            if ($id) $fromName .= ' (' . $from->getId() . ')';
+        }
+
         return $fromName;
     }
 
@@ -767,6 +789,8 @@ class Telebot
             $message = $this->update->getMessage();
         } else if ($this->update->getEditedMessage()) {
             $message = $this->update->getEditedMessage();
+        } else if ($this->update->getChannelPost()) {
+            $message = $this->update->getChannelPost();
         }
         return $message;
     }
@@ -780,7 +804,7 @@ class Telebot
         if (!$this->update)
             return null;
         $message = $this->getContext();
-        return $message->getFrom()->getId();
+        return !$this->isChannel() ? $message->getFrom()->getId() : -1;
     }
 
     /**
@@ -1778,7 +1802,7 @@ class Telebot
      * Is chat is a channel
      * @return bool
      */
-    protected function isChatChannel()
+    protected function isChannel()
     {
         return $this->getChatType() == 'channel';
     }
