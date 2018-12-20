@@ -150,6 +150,11 @@ class Telebot
     {
         $this->update = $update;
         $message = $update->getMessage();
+        if ($update->getEditedChannelPost()) {
+            $this->info('[%s][SKIP] Skipping edited channel post %s - %s', $chatId,
+                $update->getEditedChannelPost()->getMessageId(), $update->getEditedChannelPost()->getText());
+            return;
+        }
         $fromName = $this->getFromName($message, true, true);
         $chatId = $this->getChatId();
         if ($update->getEditedMessage()) {
@@ -221,6 +226,9 @@ class Telebot
                     $this->onChannelCreated();
                 } else if ($message->getNewChatPhoto()) {
                     $this->info('[%s][INFO] New chat photo is set by %s',
+                        $chatId, $fromName);
+                } else if ($message->getSticker()) {
+                    $this->info('[%s][INFO] Sticker post %s',
                         $chatId, $fromName);
                 } else {
                     $this->warning('[%s][WARN] Message with empty body: %s',
