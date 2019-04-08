@@ -1890,7 +1890,7 @@ class Telebot
      * @param string $value
      * @return bool
      */
-    protected function inDeepArray(array $array, string $value)
+    protected function inDeepArray(array $array, $value)
     {
         foreach ($array as $k => $v) {
             $key = $k;
