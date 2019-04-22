@@ -946,7 +946,7 @@ class Telebot
                 if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName, $userId)) {
                     $this->info('[RUN] Running %s with %s arguments', $commandName, count($commandParts));
                     try {
-                        call_user_func([$this, $commandName]);
+                        call_user_func_array([$this, $commandName], $commandParts);
                     } catch (\Exception $ex) {
                         $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
                     }
