@@ -231,7 +231,7 @@ class Telebot
                     $this->info('[%s][INFO] Sticker post %s',
                         $chatId, $fromName);
                 } else {
-                    $this->warning('[%s][WARN] Message with empty body: %s',
+                    $this->info('[%s][INFO] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                 }
             }
