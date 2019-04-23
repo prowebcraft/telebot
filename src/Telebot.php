@@ -1157,10 +1157,14 @@ class Telebot
     {
         if (mb_strlen($message) > 4096) {
             if ($allowChunks) {
-                $chunks = mb_split($message, 4096);
+                $chunks = [];
+                for ($i = 0; $i < floor($size / 4096); $i ++) {
+                    $chunks[] = mb_substr($message, $i > 0 ? $i * 4096 : 0, 4096);
+                }
                 $last = null;
                 foreach ($chunks as $message) {
                     $last = $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
+                    $this->info('Send chunk %s: %s', $message, $last->toJson());
                 }
                 return $last;
             } else {
