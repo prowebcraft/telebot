@@ -1010,32 +1010,37 @@ class Telebot
      * @param null $user
      * @return bool
      */
-    protected function isCommandAllowed($methodName, $user = null)
+    protected function isCommandAllowed($methodName, $user = null, $log = true)
     {
         if (!$user)
             $user = $this->getUserId();
 
         if (!$user) {
-            $this->warning('[ACCESS][DENY] Deny Access for command %s - empty user', $methodName);
+            if ($log)
+                $this->warning('[ACCESS][DENY] Deny Access for command %s - empty user', $methodName);
             return false;
         }
 
         $method = new ReflectionMethod($this, $methodName);
         $doc = $method->getDocComment();
         if (strpos($doc, '@global-admin') !== false && !$this->isGlobalAdmin()) {
-            $this->warning('[ACCESS][DENY] Deny Access for command with global admin access level %s', $methodName);
+            if ($log)
+                $this->warning('[ACCESS][DENY] Deny Access for command with global admin access level %s', $methodName);
             return false;
         }
         if (strpos($doc, '@admin') !== false && !$this->isAdmin()) {
-            $this->warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
+            if ($log)
+                $this->warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
             return false;
         }
         if (strpos($doc, '@private') !== false && !$this->isChatPrivate()) {
-            $this->warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
+            if ($log)
+                $this->warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
             return false;
         }
         if (in_array($methodName, ['addCron', 'cron', 'run', 'handle', '__construct'])) {
-            $this->warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
+            if ($log)
+                $this->warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
             return false;
         }
         return true;
@@ -1743,10 +1748,13 @@ class Telebot
     {
         $class = new ReflectionClass($this);
         $commands = [];
+        $userId = $this->getUserId();
         foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_FINAL) as $method) {
-            if (strpos($method->name, 'Command') === false) continue;
+            if (strpos($method->name, 'Command') === false)
+                continue;
             $doc = $method->getDocComment();
-            if (!$this->isCommandAllowed($method->name, $this->getUserId())) continue;
+            if (!$this->isCommandAllowed($method->name, $userId, false))
+                continue;
             $botCommand = $this->deCamel(str_replace('Command', '', $method->name));
             $lines = explode("\n", $this->cleanDoc($doc));
             $commands[] = sprintf("/%s - <i>%s</i>", $botCommand, $lines[0]);
