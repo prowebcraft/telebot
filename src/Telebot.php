@@ -17,6 +17,9 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Translation\Loader\CsvFileLoader;
+use Symfony\Component\Translation\Loader\PoFileLoader;
+use Symfony\Component\Translation\Translator;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
@@ -68,6 +71,8 @@ class Telebot
     protected $runMode = self::MODE_DEAMON;
     protected $options = [];
     protected $logger = null;
+    /** @var null|Translator  */
+    protected $translator = null;
 
     /**
      * Telebot constructor.
@@ -83,7 +88,6 @@ class Telebot
     {
         ini_set("default_charset", "UTF-8");
 
-        $this->fallbackSignalConstRegister();
         $options = array_merge([
             'appName' => $appName,
             'appDescription' => $description,
@@ -106,6 +110,7 @@ class Telebot
         if (!$this->getOption('dataFile'))
             $this->setOption('dataFile', $runtimeDir . DIRECTORY_SEPARATOR . 'data.json');
 
+        //Init Logger
         $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
         $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
         if ($this->isConsoleMode()) {
@@ -155,6 +160,14 @@ class Telebot
                 $update->getEditedChannelPost()->getMessageId(), $update->getEditedChannelPost()->getText());
             return;
         }
+        try {
+            if ($message->getFrom() && $message->getFrom()->getLanguageCode()) {
+                $this->setLocale($message->getFrom()->getLanguageCode());
+            }
+        } catch (Throwable $e) {
+            $this->error('Error setting locale - %s', $e->getMessage());
+        }
+
         $fromName = $this->getFromName($message, true, true);
         $chatId = $this->getChatId();
         if ($update->getEditedMessage()) {
@@ -425,6 +438,16 @@ class Telebot
     protected function log($message, $level = Logger::INFO, $extra = [])
     {
         return $this->logger->log($level, $message, $extra);
+    }
+
+    /**
+     * Configure Translations for you bot
+     * see https://symfony.com/doc/master/components/translation.html
+     * @param Translator $translator
+     */
+    protected function configTranslations(Translator $translator)
+    {
+
     }
 
     /**
@@ -932,7 +955,8 @@ class Telebot
                         try {
                             call_user_func_array([$this, $commandName], [$matches]);
                         } catch (\Exception $ex) {
-                            $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
+                            $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
+                            $this->reply($replyMessage);
                         }
                     }
                 }
@@ -948,7 +972,8 @@ class Telebot
                     try {
                         call_user_func_array([$this, $commandName], $commandParts);
                     } catch (\Exception $ex) {
-                        $this->reply(sprintf('Error running command: %s', $ex->getMessage()));
+                        $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
+                        $this->reply($replyMessage);
                     }
                 }
             }
@@ -1670,11 +1695,11 @@ class Telebot
         if (!isset($args[1]) || !is_numeric($args[1])) throw new \Exception('Please provide user id');
         $user = $args[1];
         $this->db->add('config.trust', $user);
-        $this->reply(sprintf('User %s now in trust list', $user));
+        $this->reply(sprintf($this->__('User %s now in trust list'), $user));
     }
 
     /**
-     * Add user to Trust list
+     * Add user to Admins list
      * @param null $e
      * @global-admin
      * @throws \Exception
@@ -1686,14 +1711,14 @@ class Telebot
         $user = $args[1];
         if ($name = $this->getUserName($user)) {
             $this->addChatConfig('admins', $user);
-            $this->reply(sprintf('User %s is admin now', $name));
+            $this->reply(sprintf($this->__('User %s is admin now'), $name));
         } else {
-            $this->reply(sprintf('User %s is unknown', $user));
+            $this->reply(sprintf($this->__('User %s is unknown'), $user));
         }
     }
 
     /**
-     * Allow bot to recieve messages from all users from this chat
+     * Allow bot to recieve messages from all users in this chat
      * @global-admin
      * @param Event $e
      * @param null $chatId
@@ -1703,7 +1728,7 @@ class Telebot
         if (!$chatId) $chatId = $this->getChatId();
         if ($this->isGlobalAdmin()) {
             $this->addConfig('config.whiteGroups', $chatId);
-            $this->reply('Группа ' . $chatId . ' теперь доступна бота');
+            $this->reply(sprintf($this->__('Group %s is allowed to anyone'), $chatId));
         }
     }
 
@@ -1733,22 +1758,23 @@ class Telebot
         foreach ($this->getConfig('config.trust', []) as $k => $trustedUser) {
             if ($trustedUser == $user) {
                 unset($this->db['config']['trust'][$k]);
-                $this->reply(sprintf('User %s has been removed from trust list', $user));
+                $this->reply(sprintf($this->__('User %s has been removed from trust list'), $user));
                 $this->db->save();
                 return;
             }
         }
-        $this->reply(sprintf('User %s not found in trust list', $user));
+        $this->reply(sprintf($this->__('User %s not found in trust list'), $user));
     }
 
     /**
-     * Описание доступных методов
+     * Show list of available commands
      */
-    public function startCommand()
+    public function listCommand()
     {
         $class = new ReflectionClass($this);
         $commands = [];
         $userId = $this->getUserId();
+        $commands[] = '<b>' . $this->__('Available commands:') .' </b>';
         foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_FINAL) as $method) {
             if (strpos($method->name, 'Command') === false)
                 continue;
@@ -1756,10 +1782,20 @@ class Telebot
             if (!$this->isCommandAllowed($method->name, $userId, false))
                 continue;
             $botCommand = $this->deCamel(str_replace('Command', '', $method->name));
+            $doc = str_replace("\r\n", "\n", $doc);
             $lines = explode("\n", $this->cleanDoc($doc));
-            $commands[] = sprintf("/%s - <i>%s</i>", $botCommand, $lines[0]);
+            $description = $this->__($lines[0]);
+            $commands[] = sprintf("/%s - <i>%s</i>", $botCommand, $description);
         }
         $this->reply(implode("\n", $commands));
+    }
+
+    /**
+     * Alias for list
+     */
+    public function startCommand()
+    {
+        $this->listCommand();
     }
 
     /**
@@ -1788,7 +1824,7 @@ class Telebot
     }
 
     /**
-     * Получить параметры из запроса
+     * Get Param of request
      * @param $e
      * @param bool $asArray
      * @return mixed
@@ -1830,7 +1866,7 @@ class Telebot
     }
 
     /**
-     * Получить ID пользователя или группы из события
+     * Get's user id or group from event
      * @param Event $e
      * @return bool
      */
@@ -1846,7 +1882,7 @@ class Telebot
     }
 
     /**
-     * Получение аргумента текущего запроса
+     * Get argument of current request
      * @param $key
      * @param bool $default
      * @return bool|string
@@ -1946,8 +1982,9 @@ class Telebot
      */
     protected function init()
     {
+        $filesDir = realpath(__DIR__ . '/../files');
         $this->db = $db = new Data([
-            'template' => realpath(__DIR__ . '/../files') . DIRECTORY_SEPARATOR . 'template.data.json',
+            'template' => $filesDir . DIRECTORY_SEPARATOR . 'template.data.json',
             'dir' => $this->getDataDirectory()
         ]);
         $apiKey = $db->get('config.api');
@@ -1960,8 +1997,44 @@ class Telebot
         $bot = new Basic($this->getConfig('config.api'), null, $this->getConfig('config.proxy'));
         $this->telegram = $bot;
 
-        //Create Logger
+        //Init Translations
+        $this->translator = new Translator('en_US');
+        //Add Default Resourse
+        $this->translator->addLoader('csv', new CsvFileLoader());
+        $this->translator->addResource('csv', $filesDir . DIRECTORY_SEPARATOR . 'locale'
+            . DIRECTORY_SEPARATOR . 'system.ru.csv', 'ru');
+        $this->configTranslations($this->translator);
+
+        //Config Logger
         $this->configLogger();
+    }
+
+    /**
+     * Set current locale
+     * @param $locale
+     */
+    public function setLocale($locale)
+    {
+        $this->translator->setLocale($locale);
+    }
+
+    /**
+     * Get Translator Object
+     * @return Translator|null
+     */
+    public function getTranslator()
+    {
+        return $this->translator;
+    }
+
+    /**
+     * Translate the message
+     * @param $message
+     * @param array $args
+     * @return string
+     */
+    public function __($message, $args = []) {
+        return $this->translator->trans($message, $args);
     }
 
     /**

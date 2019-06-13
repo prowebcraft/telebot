@@ -111,7 +111,7 @@ trait Names
     }
 
     /**
-     * Allow Users to change their alias
+     * Change current user name
      */
     public function nameCommand()
     {
