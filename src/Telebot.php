@@ -763,7 +763,7 @@ class Telebot
      */
     protected function onJoinChat()
     {
-        $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));
+        $this->updateChatInfo();
         $this->setChatOwner();
     }
 
@@ -790,6 +790,7 @@ class Telebot
      */
     protected function onGroupChatCreated()
     {
+        $this->updateChatInfo();
         $this->setChatOwner();
     }
 
@@ -2077,6 +2078,11 @@ class Telebot
     {
         $this->telegram->setWebhook();
         $this->deleteConfig('webhook_set');
+    }
+
+    protected function updateChatInfo(): void
+    {
+        $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));
     }
 
 }

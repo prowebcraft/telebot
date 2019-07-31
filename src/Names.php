@@ -114,7 +114,13 @@ trait Names
      */
     protected function getUserName($id, $default = null)
     {
-        return $this->getUserConfig($id, 'name', $default);
+        if ($name = $this->getUserConfig($id, 'name')) {
+            return $name;
+        } elseif ($first = $this->getUserConfig('info.first_name')) {
+            return $first . (($last = $this->getUserConfig($id, 'info.last_name')) ? ' ' . $last : '');
+        } else {
+            return $default;
+        }
     }
 
     /**
