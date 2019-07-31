@@ -20,6 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Translation\Loader\CsvFileLoader;
 use Symfony\Component\Translation\Loader\PoFileLoader;
 use Symfony\Component\Translation\Translator;
+use TelegramBot\Api\BaseType;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
@@ -32,6 +33,7 @@ use TelegramBot\Api\Types\Message;
 use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
 use TelegramBot\Api\Types\Update;
+use TelegramBot\Api\Types\User;
 
 class Telebot
 {
@@ -243,6 +245,18 @@ class Telebot
                 } else if ($message->getSticker()) {
                     $this->info('[%s][INFO] Sticker post %s',
                         $chatId, $fromName);
+                } else if ($message->getNewChatTitle()) {
+                    $this->info('[%s][INFO] Chat title changed from %s to %s',
+                        $chatId, $this->getChatConfig('info.title'), $message->getNewChatTitle());
+                    $this->setChatConfig('info.title', $message->getNewChatTitle());
+                } else if ($message->getNewChatMember()) {
+                    $this->info('[%s][INFO] New Chat Member %s',
+                        $chatId, $message->getNewChatMember()->toJson(true));
+                    $this->onNewChatMember($message->getNewChatMember());
+                } else if ($message->getLeftChatMember()) {
+                    $this->info('[%s][INFO] Chat Member has been Left %s',
+                        $chatId, $message->getLeftChatMember()->toJson(true));
+                    $this->onChatMemberLeft($message->getLeftChatMember());
                 } else {
                     $this->info('[%s][INFO] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -749,7 +763,26 @@ class Telebot
      */
     protected function onJoinChat()
     {
+        $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));
         $this->setChatOwner();
+    }
+
+    /**
+     * Bot has been added to a new group chat
+     * @param User $user
+     */
+    protected function onNewChatMember(User $user)
+    {
+        $this->setUserConfig($user->getId(), 'info', $user->toJson(true));
+    }
+
+    /**
+     * Bot has been added to a new group chat
+     * @param User $user
+     */
+    protected function onChatMemberLeft(User $user)
+    {
+
     }
 
     /**

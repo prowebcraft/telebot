@@ -11,6 +11,7 @@ namespace Prowebcraft\Telebot;
 
 
 use Prowebcraft\Dot;
+use TelegramBot\Api\Types\Message;
 
 trait Names
 {
@@ -26,6 +27,12 @@ trait Names
     {
         if (!$this->getUserName($id)) {
             $this->info('Adding new user to registry - %s with id %s', $name, $id);
+            /** @var Message $context */
+            if ($context = $this->getContext()) {
+                if ($context->getFrom() && $username = $context->getFrom()->getUsername()) {
+                    $this->setUserConfig($id, 'username', $username);
+                }
+            }
             $this->setUserName($id, $name);
         }
     }
