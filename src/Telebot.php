@@ -2080,7 +2080,7 @@ class Telebot
         $this->deleteConfig('webhook_set');
     }
 
-    protected function updateChatInfo(): void
+    protected function updateChatInfo()
     {
         $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));
     }
