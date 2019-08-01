@@ -163,7 +163,7 @@ class Telebot
             return;
         }
         try {
-            if ($message->getFrom() && $message->getFrom()->getLanguageCode()) {
+            if ($message && $message->getFrom() && $message->getFrom()->getLanguageCode()) {
                 $this->setLocale($message->getFrom()->getLanguageCode());
             }
         } catch (Throwable $e) {
@@ -214,6 +214,12 @@ class Telebot
             }
         } elseif ((($message = $update->getMessage()) || ($this->isChannel() && ($message = $update->getChannelPost()))) && is_object($message)) {
             if ($message->getText()) {
+                //Check for new channel
+                if ($this->isChannel() && !$this->getConfig('chat.' . $chatId)) {
+                    $this->info('[%s][NEW] New Channel has been revealed %s',
+                        $chatId, $message->getChat()->getTitle());
+                    $this->onChannelCreated();
+                }
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
                     $this->info('[%s][OK] Received message %s from %s',
                         $chatId, $message->getText(), $fromName);
