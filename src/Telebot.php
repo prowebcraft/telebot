@@ -650,7 +650,7 @@ class Telebot
                 ->setCode(function (InputInterface $input, OutputInterface $output) {
                     // output arguments and options
                     $url = $input->getArgument('url');
-                    $this->setWebhook($url);
+                    $reply = $this->setWebhook($url);
                     $output->writeln("<info>Webhook:</info> <comment>$url</comment> <info>was set</info> <comment>"
                         . json_encode($reply, JSON_PRETTY_PRINT) . "</comment>");
                 })
