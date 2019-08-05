@@ -487,6 +487,7 @@ class Telebot
             $client = new \Raven_Client($sentry);
             $handler = new \Monolog\Handler\RavenHandler($client);
             $handler->setFormatter(new \Monolog\Formatter\LineFormatter("%message% %context% %extra%\n"));
+            $handler->setLevel(Logger::WARNING);
             $this->logger->pushHandler($handler);
         }
         //Adding Some Context
