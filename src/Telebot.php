@@ -221,9 +221,11 @@ class Telebot
                     $this->onChannelCreated();
                 }
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    $this->info('[%s][OK] Received message %s from %s',
-                        $chatId, $message->getText(), $fromName);
-                    $this->handle($message);
+                    if (!$this->getConfig('config.skip_channel_messages')) {
+                        $this->info('[%s][OK] Received message %s from %s',
+                            $chatId, $message->getText(), $fromName);
+                        $this->handle($message);
+                    }
                 } else {
                     $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
                         $chatId, $message->getText(), $fromName);
@@ -690,7 +692,9 @@ class Telebot
                 $this->error("Invalid incoming request: %s", $request);
                 $this->sendErrorResponse('Invalid request');
             }
-            $this->info("Incoming Request: %s", $request);
+            if (!$this->getConfig('config.skip_incoming_request_log')) {
+                $this->info("Incoming Request: %s", $request);
+            }
             $update = Update::fromResponse($update);
             $this->handleUpdate($update);
         }
