@@ -221,7 +221,7 @@ class Telebot
                     $this->onChannelCreated();
                 }
                 if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    if (!$this->getConfig('config.skip_channel_messages')) {
+                    if (!($this->isChannel() && $this->getConfig('config.skip_channel_messages'))) {
                         $this->info('[%s][OK] Received message %s from %s',
                             $chatId, $message->getText(), $fromName);
                         $this->handle($message);
