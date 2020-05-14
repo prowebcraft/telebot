@@ -18,7 +18,6 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Translation\Loader\CsvFileLoader;
-use Symfony\Component\Translation\Loader\PoFileLoader;
 use Symfony\Component\Translation\Translator;
 use TelegramBot\Api\BaseType;
 use TelegramBot\Api\BotApi;
@@ -158,7 +157,7 @@ class Telebot
         $this->update = $update;
         $message = $update->getMessage();
         if ($update->getEditedChannelPost()) {
-            $this->info('[%s][SKIP] Skipping edited channel post %s - %s', $chatId,
+            $this->info('[%s][SKIP] Skipping edited channel post %s - %s', $update->getEditedChannelPost()->getChat()->getId(),
                 $update->getEditedChannelPost()->getMessageId(), $update->getEditedChannelPost()->getText());
             return;
         }
@@ -166,7 +165,7 @@ class Telebot
             if ($message && $message->getFrom() && $message->getFrom()->getLanguageCode()) {
                 $this->setLocale($message->getFrom()->getLanguageCode());
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->error('Error setting locale - %s', $e->getMessage());
         }
 
@@ -247,6 +246,10 @@ class Telebot
                     $this->info('[%s][NEW] Bot has been invited to a new channel %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
                     $this->onChannelCreated();
+                } else if (($oldId = $message->getMigrateFromChatId())) {
+                    $this->info('[%s][NEW] Chat has been migrated to super group with id %s',
+                        $chatId, $oldId);
+                    $this->onMigrateToSuperGroup($oldId);
                 } else if ($message->getNewChatPhoto()) {
                     $this->info('[%s][INFO] New chat photo is set by %s',
                         $chatId, $fromName);
@@ -822,6 +825,16 @@ class Telebot
     }
 
     /**
+     * Chat was converted to supergroup
+     * @param int $oldId
+     */
+    protected function onMigrateToSuperGroup(int $oldId = null)
+    {
+        $this->deleteConfig("chat.{$oldId}", false);
+        $this->updateChatInfo();
+    }
+
+    /**
      * Get Message author name
      * @param $message
      * @param bool $username
@@ -1230,10 +1243,11 @@ class Telebot
         $allowChunks = true
     )
     {
-        if (mb_strlen($message) > 4096) {
+        $size = mb_strlen($message);
+        if ($size > 4096) {
             if ($allowChunks) {
                 $chunks = [];
-                for ($i = 0; $i < floor($size / 4096); $i ++) {
+                for ($i = 0; $i < ceil($size / 4096); $i ++) {
                     $chunks[] = mb_substr($message, $i > 0 ? $i * 4096 : 0, 4096);
                 }
                 $last = null;
@@ -1514,7 +1528,7 @@ class Telebot
      */
     public function updateMessageReplyMarkup($id, $markup)
     {
-        $target = $this->getTarget($e);
+        $target = $this->getTarget();
         if (!$target)
             return;
         $this->telegram->editMessageReplyMarkup($target, $id, $markup);
@@ -1723,7 +1737,7 @@ class Telebot
             $markup = new InlineKeyboardMarkup($markup);
         }
         if (!($markup instanceof InlineKeyboardMarkup)) {
-            throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($answers, true));
+            throw new \InvalidArgumentException('Invalid type of inline markup: ' . var_export($markup, true));
         }
         $this->updateMessage($id, $text, 'html', true, $markup);
     }
@@ -2091,6 +2105,9 @@ class Telebot
         $this->deleteConfig('webhook_set');
     }
 
+    /**
+     * Update chat information in load db
+     */
     protected function updateChatInfo()
     {
         $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));

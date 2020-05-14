@@ -116,7 +116,7 @@ trait Names
     {
         if ($name = $this->getUserConfig($id, 'name')) {
             return $name;
-        } elseif ($first = $this->getUserConfig('info.first_name')) {
+        } elseif ($first = $this->getUserConfig($id, 'info.first_name')) {
             return $first . (($last = $this->getUserConfig($id, 'info.last_name')) ? ' ' . $last : '');
         } else {
             return $default;

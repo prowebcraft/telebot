@@ -41,48 +41,4 @@ class Basic extends BotApi
         return parent::getUrl();
     }
 
-
-    /**
-     * Call method
-     *
-     * @param string $method
-     * @param array|null $data
-     *
-     * @return mixed
-     * @throws \TelegramBot\Api\Exception
-     * @throws \TelegramBot\Api\HttpException
-     * @throws \TelegramBot\Api\InvalidJsonException
-     */
-    public function call($method, array $data = null)
-    {
-        $options = [
-            CURLOPT_URL => $this->getUrl().'/'.$method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => null,
-            CURLOPT_POSTFIELDS => null,
-            CURLOPT_SSL_VERIFYPEER => false
-        ];
-
-        if ($data) {
-            $options[CURLOPT_POST] = true;
-            $options[CURLOPT_POSTFIELDS] = $data;
-        }
-
-        $response = self::jsonValidate($this->executeCurl($options), $this->returnArray);
-
-        if ($this->returnArray) {
-            if (!isset($response['ok']) || !$response['ok']) {
-                throw new Exception($response['description'], $response['error_code']);
-            }
-
-            return $response['result'];
-        }
-
-        if (!$response->ok) {
-            throw new Exception($response->description, $response->error_code);
-        }
-
-        return $response->result;
-    }
-
 }
