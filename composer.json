@@ -23,9 +23,9 @@
     "require": {
         "prowebcraft/php-json-db": "~0.1",
         "telegram-bot/api": "~2.3.13",
-        "symfony/console": "~3.3",
+        "symfony/console": "^5.0",
         "monolog/monolog": "~1.23.0",
-        "symfony/translation": "~3.4.28",
+        "symfony/translation": "^5.0",
         "ext-curl": "*",
         "ext-json": "*"
     }
