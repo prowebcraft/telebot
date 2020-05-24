@@ -112,11 +112,7 @@ class Telebot
             $this->setOption('dataFile', $runtimeDir . DIRECTORY_SEPARATOR . 'data.json');
 
         //Init Logger
-        $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
-        $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
-        if ($this->isConsoleMode()) {
-            $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
-        }
+        $this->initLogger();
     }
 
     /**
@@ -2111,6 +2107,20 @@ class Telebot
     protected function updateChatInfo()
     {
         $this->setChatConfig('info', $this->getContext()->getChat()->toJson(true));
+    }
+
+    /**
+     * Init Logger
+     * @param $appName
+     */
+    protected function initLogger(): void
+    {
+        $appName = $this->getOption('appName');
+        $this->logger = new Logger('telebot-' . Utils::cleanIdentifier($appName));
+        $this->logger->pushHandler(new RotatingFileHandler($this->getRuntimeDirectory() . DIRECTORY_SEPARATOR . 'bot.log', 30, Logger::INFO));
+        if ($this->isConsoleMode()) {
+            $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
+        }
     }
 
 }
