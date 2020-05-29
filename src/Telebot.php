@@ -309,6 +309,39 @@ class Telebot
         return $this;
     }
 
+    public function processWebhook(): void
+    {
+//Check if webhook was configured
+        if (!($webhook = $this->getConfig('webhook'))) {
+            throw new \InvalidArgumentException('Please set webhook url in config');
+        }
+
+        if (!$this->getConfig('webhook_set')) {
+            $this->telegram->setWebhook($webhook);
+            $this->setConfig('webhook_set', time());
+        }
+
+        $this->runMode = self::MODE_WEBHOOK;
+        $bot = $this->telegram;
+        $this->beforeStart();
+
+        $request = file_get_contents("php://input");
+        if (empty($request))
+            $this->sendErrorResponse('Empty request');
+        $update = json_decode($request, true);
+        if (!$update)
+            $this->sendErrorResponse('Invalid request');
+        if (!Dot::getValue($update, 'update_id')) {
+            $this->error("Invalid incoming request: %s", $request);
+            $this->sendErrorResponse('Invalid request');
+        }
+        if (!$this->getConfig('config.skip_incoming_request_log')) {
+            $this->info("Incoming Request: %s", $request);
+        }
+        $update = Update::fromResponse($update);
+        $this->handleUpdate($update);
+    }
+
     /**
      * Log debug [100/6] message (sprintf style)
      * @param string $format
@@ -650,7 +683,6 @@ class Telebot
         $this->init();
         //Check if webhook was set
         if ($this->isConsoleMode()) {
-
             (new Application('telebot', '1.0.0'))
                 ->register('webhook')
                 ->setDescription('Configure webhook of bot')
@@ -664,38 +696,9 @@ class Telebot
                 })
                 ->getApplication()
                 ->run();
-
         } else {
-
-            //Check if webhook was configured
-            if (!($webhook = $this->getConfig('webhook'))) {
-                throw new \InvalidArgumentException('Please set webhook url in config');
-            }
-
-            if (!$this->getConfig('webhook_set')) {
-                $this->telegram->setWebhook($webhook);
-                $this->setConfig('webhook_set', time());
-            }
-
-            $this->runMode = self::MODE_WEBHOOK;
-            $bot = $this->telegram;
-            $this->beforeStart();
-
-            $request = file_get_contents("php://input");
-            if (empty($request))
-                $this->sendErrorResponse('Empty request');
-            $update = json_decode($request, true);
-            if (!$update)
-                $this->sendErrorResponse('Invalid request');
-            if (!Dot::getValue($update, 'update_id')) {
-                $this->error("Invalid incoming request: %s", $request);
-                $this->sendErrorResponse('Invalid request');
-            }
-            if (!$this->getConfig('config.skip_incoming_request_log')) {
-                $this->info("Incoming Request: %s", $request);
-            }
-            $update = Update::fromResponse($update);
-            $this->handleUpdate($update);
+            //Process webhook contents
+            $this->processWebhook();
         }
     }
 
@@ -2035,7 +2038,7 @@ class Telebot
      * Perform init (load database, restore replies, config loggers etc)
      * @throws Exception
      */
-    protected function init()
+    public function init()
     {
         $filesDir = realpath(__DIR__ . '/../files');
         $this->db = $db = new Data([
