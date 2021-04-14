@@ -270,7 +270,7 @@ class Telebot
                 }
             }
         } else {
-            $this->error('[%s][ERROR] Cannot handle message. Update Info: %s',
+            $this->debug('[%s][ERROR] Cannot handle message. Update Info: %s',
                 $update->getUpdateId(), json_encode($update, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
