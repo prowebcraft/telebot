@@ -891,9 +891,14 @@ class Telebot
      */
     protected function getUserId()
     {
-        if (!$this->update)
+        if (!$this->update) {
             return null;
-        $message = $this->getContext();
+        }
+
+        if (!$message = $this->getContext()) {
+            return null;
+        }
+
         if ($this->isChannel()) {
             return -1;
         }
