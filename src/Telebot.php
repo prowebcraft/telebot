@@ -846,7 +846,7 @@ class Telebot
             $message = $this->getContext();
         }
         if (!$message) {
-            $this->warning('Cannot detect from name - unhandled message type %s', $this->update->toJson());
+            $this->info('Cannot detect from name - unhandled message type %s', $this->update->toJson());
             return '';
         }
         if ($this->isChannel()) {
