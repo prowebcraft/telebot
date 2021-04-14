@@ -894,7 +894,11 @@ class Telebot
         if (!$this->update)
             return null;
         $message = $this->getContext();
-        return !$this->isChannel() ? $message->getFrom()->getId() : -1;
+        if ($this->isChannel()) {
+            return -1;
+        }
+
+        return $message->getFrom() ? $message->getFrom()->getId() : null;
     }
 
     /**
