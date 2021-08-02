@@ -1543,11 +1543,12 @@ class Telebot
     }
 
     /**
-     * @param null $chatId
+     * Send document
      * @param string $file
+     * @param null $chatId
      * @param Event $e
      */
-    public function sendDocument($chatId = null, $file, $e = null)
+    public function sendDocument($file, $chatId = null, $e = null)
     {
         $this->info('[SEND_DOCUMENT] chat_id: %s, document: %s', $chatId, $file);
         if (!$e) $e = $this->e;
