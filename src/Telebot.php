@@ -226,10 +226,19 @@ class Telebot
                         $chatId, $message->getText(), $fromName);
                 }
             } else {
-                if ($message->getNewChatMember() && $message->getNewChatMember()->getId() == $this->getBotId()) {
-                    $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
-                        $chatId, $message->getChat()->getTitle(), $fromName);
-                    $this->onJoinChat();
+                if ($newMembers = $message->getNewChatMembers()) {
+                    /** @var User $member */
+                    foreach ($newMembers as $member) {
+                        if ($member->getId() === $this->getBotId()) {
+                            $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
+                                $chatId, $message->getChat()->getTitle(), $fromName);
+                            $this->onJoinChat();
+                        } else {
+                            $this->info('[%s][INFO] New Chat Member %s',
+                                $chatId, $member->toJson(true));
+                            $this->onNewChatMember($member);
+                        }
+                    }
                 } else if ($message->isGroupChatCreated()) {
                     $this->info('[%s][NEW] Bot has been invited to a new group chat %s by %s',
                         $chatId, $message->getChat()->getTitle(), $fromName);
@@ -256,10 +265,6 @@ class Telebot
                     $this->info('[%s][INFO] Chat title changed from %s to %s',
                         $chatId, $this->getChatConfig('info.title'), $message->getNewChatTitle());
                     $this->setChatConfig('info.title', $message->getNewChatTitle());
-                } else if ($message->getNewChatMember()) {
-                    $this->info('[%s][INFO] New Chat Member %s',
-                        $chatId, $message->getNewChatMember()->toJson(true));
-                    $this->onNewChatMember($message->getNewChatMember());
                 } else if ($message->getLeftChatMember()) {
                     $this->info('[%s][INFO] Chat Member has been Left %s',
                         $chatId, $message->getLeftChatMember()->toJson(true));
@@ -781,7 +786,7 @@ class Telebot
     }
 
     /**
-     * Bot has been added to a new group chat
+     * New user has join the chat
      * @param User $user
      */
     protected function onNewChatMember(User $user)

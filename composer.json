@@ -22,7 +22,7 @@
     },
     "require": {
         "prowebcraft/php-json-db": "~0.1",
-        "telegram-bot/api": "~2.3.13",
+        "telegram-bot/api": "^2.3",
         "symfony/console": "^5.0",
         "monolog/monolog": "~2.1",
         "symfony/translation": "^5.0",
