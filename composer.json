@@ -1,6 +1,7 @@
 {
     "name": "prowebcraft/telebot",
     "description": "Telegram bot with dialogs and session management",
+    "minimum-stability": "dev",
     "keywords": [
         "php",
         "telegram",
@@ -21,7 +22,7 @@
         }
     },
     "require": {
-        "prowebcraft/php-json-db": "~0.1",
+        "prowebcraft/php-json-db": "dev-master",
         "telegram-bot/api": "^2.3",
         "symfony/console": "^5.0",
         "monolog/monolog": "~2.1",

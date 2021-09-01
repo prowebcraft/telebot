@@ -523,6 +523,7 @@ class Telebot
         if ($sentry = $this->getConfig('config.sentry_client_endpoint')) {
             if (!class_exists('Raven_Client'))
                 throw new \InvalidArgumentException('sentry client is not installed, please run composer require "sentry/sentry"');
+
             $client = new \Raven_Client($sentry);
             $handler = new \Monolog\Handler\RavenHandler($client);
             $handler->setFormatter(new \Monolog\Formatter\LineFormatter("%message% %context% %extra%\n"));
