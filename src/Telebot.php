@@ -222,6 +222,22 @@ class Telebot
                         $this->handle($message);
                     }
                 } else {
+                    if ($this->getConfig('config.auto_request_access_from_owner')) {
+                        $requestMessage = [];
+                        $requestMessage[] = $this->__('Request from untrusted user');
+                        $requestMessage[] = $fromName;
+                        $requestMessage[] = $this->__('Allow access?');
+                        $this->sendMessage(
+                            $this->getConfig('config.owner'),
+                            implode("\n", $requestMessage),
+                            'HTML',
+                            true,
+                            null,
+                            new ReplyKeyboardMarkup([[[
+                                'text' => '/trust ' . $this->getUserId()
+                            ]]], true, true)
+                        );
+                    }
                     $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
                         $chatId, $message->getText(), $fromName);
                 }
@@ -778,6 +794,15 @@ class Telebot
     }
 
     /**
+     * Then message has no valid handlers
+     * @param Message $message
+     */
+    public function onUnhandledMessage(Message $message)
+    {
+
+    }
+    
+    /**
      * Bot has been added to a new group chat
      */
     protected function onJoinChat()
@@ -793,6 +818,7 @@ class Telebot
     protected function onNewChatMember(User $user)
     {
         $this->setUserConfig($user->getId(), 'info', $user->toJson(true));
+
     }
 
     /**
@@ -1030,6 +1056,7 @@ class Telebot
                             $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
                             $this->reply($replyMessage);
                         }
+                        return;
                     }
                 }
             }
@@ -1047,8 +1074,10 @@ class Telebot
                         $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
                         $this->reply($replyMessage);
                     }
+                    return;
                 }
             }
+            $this->onUnhandledMessage($message);
         }
     }
 
@@ -1645,6 +1674,13 @@ class Telebot
         if (!empty($answers) && is_array($answers)) {
             foreach ($answers as $group) {
                 foreach ($group as $answer) {
+                    if (is_array($answer)) {
+                        if (isset($answer['text'])) {
+                            $answer = $answer['text'];
+                        } else {
+                            continue;
+                        }
+                    }
                     Dot::setValue($this->asksAnswers, "{$chatId}.{$answer}", $askMessageId);
                 }
             }

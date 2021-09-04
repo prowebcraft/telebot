@@ -4,6 +4,7 @@
     "owner": null,
     "admins": [],
     "protect": false,
+    "auto_request_access_from_owner": false,
     "trust": [],
     "whiteGroups": []
   }

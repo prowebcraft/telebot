@@ -13,3 +13,5 @@ User %s is unknown;Пользователь %s не найден
 Group %s is allowed to anyone;Группа %s открыта для всех пользователей
 User %s has been removed from trust list;Пользователь %s удален из белого списка
 User %s not found in trust list;Пользователь %s не найден в белом списке
+Request from untrusted user;Запрос от неавторизованного пользователя
+Allow access?;Разрешить доступ?

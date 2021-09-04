@@ -49,6 +49,18 @@ trait Names
 
     /**
      * Retrieve current user config
+     * @param string $key
+     * @param mixed $default
+     * Default value for config key
+     * @return mixed
+     */
+    protected function getCurrentUserConfig($key, $default = null)
+    {
+        return $this->getUserConfig($this->getUserId(), $key, $default);
+    }
+
+    /**
+     * Retrieve user config
      * @param $id
      * User Id
      * @param null|string $key
@@ -68,11 +80,25 @@ trait Names
                 $this->setConfig("config.names.$id", $this->registry[$id]);
             }
         }
-        if ($key !== null)
+        if ($key !== null) {
             return Dot::getValue($this->registry[$id], $key, $default);
+        }
+
         return $this->registry[$id];
     }
 
+    /**
+     * Set config value for current user
+     * @param $key
+     * Config key
+     * @param $value
+     * Config value
+     */
+    public function setCurrentUserConfig($key, $value)
+    {
+        return $this->setUserConfig($this->getUserId(), $key, $value);
+    }
+    
     /**
      * Set config value for user
      * @param $id
@@ -84,7 +110,7 @@ trait Names
      */
     protected function setUserConfig($id, $key, $value) {
         $config = $this->getUserConfig($id);
-        $config[$key] = $value;
+        Dot::setValue($config, $key, $value);
         $this->registry[$id] = $config;
         $this->setConfig("config.names.$id", $config);
     }
