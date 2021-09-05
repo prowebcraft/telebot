@@ -537,11 +537,11 @@ class Telebot
             $this->logger->pushHandler(new LogEntriesHandler($rapid, true, Logger::INFO));
         }
         if ($sentry = $this->getConfig('config.sentry_client_endpoint')) {
-            if (!class_exists('Raven_Client'))
-                throw new \InvalidArgumentException('sentry client is not installed, please run composer require "sentry/sentry"');
+            if (!class_exists('\Sentry\Monolog\Handler'))
+                throw new \InvalidArgumentException('sentry client is not installed, please run composer require "sentry/sdk"');
 
-            $client = new \Raven_Client($sentry);
-            $handler = new \Monolog\Handler\RavenHandler($client);
+            \Sentry\init(['dsn' => $sentry ]);
+            $handler = new \Sentry\Monolog\Handler(\Sentry\SentrySdk::getCurrentHub());
             $handler->setFormatter(new \Monolog\Formatter\LineFormatter("%message% %context% %extra%\n"));
             $handler->setLevel(Logger::WARNING);
             $this->logger->pushHandler($handler);
