@@ -1736,8 +1736,12 @@ class Telebot
      * @param array $extraData
      * @return Message|false
      */
-    public function askInline($text, $answers = [], $callback = null, $extraData = [])
+    public function askInline($text, $answers = [], $callback = null, $extraData = [], $target = null)
     {
+        if ($target === null) {
+            $target = $this->getChatId();
+        }
+
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . json_encode($answers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) : ''));
         $e = $this->e;
         if (is_array($answers)) {
@@ -1754,9 +1758,8 @@ class Telebot
             return false;
         }
         try {
-            $send = $this->telegram->sendMessage($this->getChatId(), $text, 'HTML', true, null, $answers);
+            $send = $this->telegram->sendMessage($target, $text, 'HTML', true, null, $answers);
             if ($callback) {
-                $chatId = $this->getChatId();
                 $payload = [
                     'id' => $send->getMessageId(),
                     'time' => time(),
@@ -1764,7 +1767,7 @@ class Telebot
                     'owner' => $this->getUserId(),
                     'extra' => $extraData
                 ];
-                Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $payload);
+                Dot::setValue($this->inlineAnswers, "{$target}.{$send->getMessageId()}", $payload);
                 $this->saveReplies();
             }
             return $send;
