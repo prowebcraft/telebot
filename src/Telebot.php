@@ -1806,6 +1806,18 @@ class Telebot
         $user = $args[1];
         $this->db->add('config.trust', $user);
         $this->reply(sprintf($this->__('User %s now in trust list'), $user));
+        $this->onUserTrust($user);
+    }
+
+    /**
+     * Event on user trust action
+     * @param $user
+     * @throws \TelegramBot\Api\Exception
+     * @throws \TelegramBot\Api\InvalidArgumentException
+     */
+    protected function onUserTrust($user)
+    {
+        $this->sendMessage($user, $this->__('Greetings. Now you have access to all features of this bot'));
     }
 
     /**

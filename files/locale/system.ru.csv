@@ -8,6 +8,7 @@ Show list of available commands;Описание доступных методо
 Change current user name;Смена имени пользователя
 Error running command;Ошибка выполнения команды
 User %s now in trust list;Пользователь %s добавлен в белый список
+Greetings. Now you have access to all features of this bot;Здравствуйте! Теперь у вас есть полный доступ к этому боту
 User %s is admin now;Пользователь %s назначен администратором
 User %s is unknown;Пользователь %s не найден
 Group %s is allowed to anyone;Группа %s открыта для всех пользователей
