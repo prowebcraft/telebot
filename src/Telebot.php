@@ -1315,6 +1315,40 @@ class Telebot
     }
 
     /**
+     * Send notification to bot owner
+     * @param string $message
+     * @param string $parse
+     * @param false $disablePreview
+     * @param null $replyToMessageId
+     * @param null $replyMarkup
+     * @param false $disableNotification
+     * @param bool $allowChunks
+     * @return Message|void|null
+     * @throws \TelegramBot\Api\Exception
+     * @throws \TelegramBot\Api\InvalidArgumentException
+     */
+    public function sendMessageToOwner(
+        $message,
+        $parse = 'HTML',
+        $disablePreview = false,
+        $replyToMessageId = null,
+        $replyMarkup = null,
+        $disableNotification = false,
+        $allowChunks = true
+    ) {
+        if (!$userId = $this->getUserId()) {
+            return null;
+        }
+        if (!$ownerId = $this->getConfig('config.owner')) {
+            return null;
+        }
+
+        if ($userId != $ownerId) {
+            return $this->sendMessage($ownerId, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
+        }
+    }
+
+    /**
      * Use this method to send photos. On success, the sent Message is returned.
      *
      * @param \CURLFile|string $photo
