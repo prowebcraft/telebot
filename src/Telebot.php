@@ -495,7 +495,15 @@ class Telebot
         } else {
             $text = array_shift($args);
             $args = array_map(function ($v) {
-                if (is_array($v) || is_object($v)) return json_encode($v, JSON_UNESCAPED_UNICODE);
+                if (is_bool($v)) {
+                    return $v ? 'true' : 'false';
+                }
+                if (is_object($v) && method_exists($v, '__toString')) {
+                    return (string)$v;
+                }
+                if (is_array($v) || is_object($v)) {
+                    return json_encode($v, JSON_UNESCAPED_UNICODE);
+                }
                 return $v;
             }, $args);
             $message = vsprintf($text, $args);
