@@ -21,9 +21,15 @@
             "Prowebcraft\\Telebot\\" : "src"
         }
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/prowebcraft/telegram-api"
+        }
+    ],
     "require": {
         "prowebcraft/php-json-db": "dev-master",
-        "telegram-bot/api": "^2.3",
+        "telegram-bot/api": "dev-master",
         "symfony/console": "^5.0",
         "monolog/monolog": "~2.1",
         "symfony/translation": "^5.0",
