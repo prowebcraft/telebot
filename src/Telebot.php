@@ -99,17 +99,20 @@ class Telebot
             'logFile' => null,
             'dataFile' => null
         ], $options);
-        if ($options['runtimeDir'] === null)
+        if ($options['runtimeDir'] === null) {
             $options['runtimeDir'] = $options['appDir'] . DIRECTORY_SEPARATOR . 'runtime';
+        }
         $this->setOptions($options);
         $runtimeDir = $this->getOption('runtimeDir');
         if (!file_exists($runtimeDir))
             mkdir($runtimeDir, 0777, true);
 
-        if (!$this->getOption('logFile'))
-            $this->setOption('logFile', $runtimeDir . DIRECTORY_SEPARATOR . 'bot.log');
-        if (!$this->getOption('dataFile'))
-            $this->setOption('dataFile', $runtimeDir . DIRECTORY_SEPARATOR . 'data.json');
+        if (!$this->getOption('logFile')) {
+            $this->setOption('logFile', 'bot.log');
+        }
+        if (!$this->getOption('dataFile')) {
+            $this->setOption('dataFile', 'data.json');
+        }
 
         //Init Logger
         $this->initLogger();
@@ -208,7 +211,7 @@ class Telebot
                 }
             }
         } elseif ((($message = $update->getMessage()) || ($this->isChannel() && ($message = $update->getChannelPost()))) && is_object($message)) {
-            if ($message->getText()) {
+            if ($message->getText() || $message->getContact()) {
                 //Check for new channel
                 if ($this->isChannel() && !$this->getConfig('chat.' . $chatId)) {
                     $this->info('[%s][NEW] New Channel has been revealed %s',
@@ -285,6 +288,9 @@ class Telebot
                     $this->info('[%s][INFO] Chat Member has been Left %s',
                         $chatId, $message->getLeftChatMember()->toJson(true));
                     $this->onChatMemberLeft($message->getLeftChatMember());
+                } else if ($message->getContact()) {
+                    $this->info('[%s][INFO] Shared contact %s',
+                        $chatId, $message->getContact()->toJson(true));
                 } else {
                     $this->info('[%s][INFO] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -1000,7 +1006,8 @@ class Telebot
     public function handle($message)
     {
         //Regular Message
-        $command = $message->getText();
+        $replyText = $message->getText();
+        $command = $replyText;
         $commandParts = explode(" ", $command);
         $this->e = $e = new Event();
         $e->setMessage($message);
@@ -1015,11 +1022,11 @@ class Telebot
             //Direct reply
             $replyToId = $message->getReplyToMessage()->getMessageId();
             $replyMatch = 'To Message Id';
-        } elseif ($id = Dot::getValue($this->asksAnswers, "$chatId.{$message->getText()}")) {
+        } elseif ($replyText && $id = Dot::getValue($this->asksAnswers, "$chatId.{$replyText}")) {
             //Reply match by answer variant
             $replyToId = $id;
             $replyMatch = 'By Text Answer';
-        } elseif ($message->getText()[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$chatId][$userId])) {
+        } elseif ($replyText && $replyText[0] != '/' && $this->isChatPrivate() && isset($this->asksUsers[$chatId][$userId])) {
             //Reply by waiting user input
             //Check question type
             if ($replyData = Dot::getValue($this->asks, "$chatId.{$this->asksUsers[$chatId][$userId]}")) {
@@ -1032,9 +1039,9 @@ class Telebot
         }
         if ($replyToId && $replyData = Dot::getValue($this->asks, "$chatId.$replyToId")) {
             //ReplyTo Message
-            $this->info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $message->getText());
-            $replyText = trim($message->getText());
-            if (!empty($replyData['answers']) && !$this->inDeepArray($replyData['answers'], $replyText) !== false) {
+            $this->info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $replyText);
+            $replyText = trim($replyText);
+            if (!($replyData['contact_request'] && $message->getContact()) && !empty($replyData['answers']) && !$this->inDeepArray($replyData['answers'], $replyText) !== false) {
                 $this->warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
                 $replyToId = null;
             } else {
@@ -1068,7 +1075,7 @@ class Telebot
                     }
                 }
             }
-            if ($command[0] == "/") {
+            if ($command && $command[0] == "/") {
                 $command = mb_substr(array_shift($commandParts), 1);
                 if (($atPos = mb_stripos($command, '@'))) $command = mb_substr($command, 0, $atPos);
                 $command = $this->toCamel($command);
@@ -1698,11 +1705,23 @@ class Telebot
     private function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false, $extraData = [])
     {
         $e = $this->e;
+        $contactRequest = !empty(array_filter($answers, function ($answerGroup) {
+            if (is_array($answerGroup)) {
+                foreach ($answerGroup as $answer) {
+                    if (isset($answer['request_contact']) && $answer['request_contact']) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }));
         $payload = [
             'id' => $askMessageId,
             'question' => $text,
             'callback' => $callback,
             'user' => $this->getUserId(),
+            'contact_request' => $contactRequest,
             'answers' => $answers,
             'multiple' => $multiple,
             'extra' => $extraData,
@@ -2152,10 +2171,13 @@ class Telebot
         $filesDir = realpath(__DIR__ . '/../files');
         $this->db = $db = new Data([
             'template' => $filesDir . DIRECTORY_SEPARATOR . 'template.data.json',
-            'dir' => $this->getDataDirectory()
+            'dir' => $this->getDataDirectory(),
+            'name' => $this->getOption('dataFile'),
         ]);
         $apiKey = $db->get('config.api');
-        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') throw new Exception('Please set config.api key in data.json config');
+        if (empty($apiKey) || $apiKey == 'TELEGRAM_BOT_API_KEY') {
+            throw new Exception('Please set config.api key in config file ('.$this->db->db.')');
+        }
 
         //Restore Waiting Messages
         $this->restoreReplies();
