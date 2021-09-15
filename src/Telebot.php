@@ -1705,17 +1705,20 @@ class Telebot
     private function addWaitingReply($askMessageId, $text, $answers, $callback = null, $multiple = false, $extraData = [])
     {
         $e = $this->e;
-        $contactRequest = !empty(array_filter($answers, function ($answerGroup) {
-            if (is_array($answerGroup)) {
-                foreach ($answerGroup as $answer) {
-                    if (isset($answer['request_contact']) && $answer['request_contact']) {
-                        return true;
+        $contactRequest = false;
+        if ($answers) {
+            $contactRequest = !empty(array_filter($answers, function ($answerGroup) {
+                if (is_array($answerGroup)) {
+                    foreach ($answerGroup as $answer) {
+                        if (isset($answer['request_contact']) && $answer['request_contact']) {
+                            return true;
+                        }
                     }
                 }
-            }
+                return false;
+            }));
+        }
 
-            return false;
-        }));
         $payload = [
             'id' => $askMessageId,
             'question' => $text,
