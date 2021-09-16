@@ -1018,10 +1018,17 @@ class Telebot
         $chatId = $this->getChatId();
         $userId = $this->getUserId();
         $guessReply = false;
+
         if ($message->getReplyToMessage() && Dot::getValue($this->asks, "$chatId.{$message->getReplyToMessage()->getMessageId()}")) {
             //Direct reply
             $replyToId = $message->getReplyToMessage()->getMessageId();
             $replyMatch = 'To Message Id';
+        } elseif ($message->getContact() && $waitingContact = array_filter($this->asks[$chatId] ?? [], function ($ask) {
+            return ($ask['contact_request'] ?? null) === true;
+        })) {
+            //Reply match by waiting contact
+            $replyToId = array_shift($waitingContact)['id'];
+            $replyMatch = 'By Text Answer';
         } elseif ($replyText && $id = Dot::getValue($this->asksAnswers, "$chatId.{$replyText}")) {
             //Reply match by answer variant
             $replyToId = $id;
@@ -1058,7 +1065,6 @@ class Telebot
                     call_user_func($callback, new Answer($message, $replyData));
                 }
             }
-
         }
         if (!$replyToId) {
             foreach ($this->matches as $expression => $commandName) {
