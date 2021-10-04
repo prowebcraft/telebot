@@ -773,8 +773,13 @@ class Telebot
                     }
                 } catch (HttpException $e) {
                     if ($e->getCode() == 409) {
-                        $this->warning('Webhook was set. Switched to console mode');
-                        $this->disableWebhook();
+                        $message = $e->getMessage();
+                        if (stripos($message, 'terminated by other getUpdates request') > 0 ) {
+                            $this->warning('Conflict: terminated by other getUpdates request; make sure that only one bot instance is running');
+                        } else {
+                            $this->warning('Webhook was set. Switched to console mode');
+                            $this->disableWebhook();
+                        }
                     } else {
                         $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                         $this->checkErrorsCount();
