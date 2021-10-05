@@ -1357,7 +1357,7 @@ class Telebot
         if (!$userId = $this->getUserId()) {
             return null;
         }
-        if (!$ownerId = $this->getConfig('config.owner')) {
+        if (!$ownerId = $this->getOwnerId()) {
             return null;
         }
 
@@ -2269,6 +2269,15 @@ class Telebot
         if ($this->isConsoleMode()) {
             $this->logger->pushHandler(new StreamHandler('php://stdout', Logger::DEBUG));
         }
+    }
+
+    /**
+     * Get bot owner id
+     * @return mixed
+     */
+    protected function getOwnerId(): mixed
+    {
+        return $this->getConfig('config.owner');
     }
 
 }
