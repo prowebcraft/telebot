@@ -1352,7 +1352,7 @@ class Telebot
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $allowChunks = true
+        $sendToMyself = false
     ) {
         if (!$userId = $this->getUserId()) {
             return null;
@@ -1361,7 +1361,7 @@ class Telebot
             return null;
         }
 
-        if ($userId != $ownerId) {
+        if ($sendToMyself || $userId != $ownerId) {
             return $this->sendMessage($ownerId, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
         }
     }
