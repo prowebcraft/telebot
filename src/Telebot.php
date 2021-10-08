@@ -1215,8 +1215,10 @@ class Telebot
     protected function isGlobalAdmin()
     {
         $userId = $this->getUserId();
-        if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId)
+        if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId) {
             return true;
+        }
+
         return $userId == $this->getConfig('config.owner');
     }
     
@@ -1226,9 +1228,11 @@ class Telebot
      */
     protected function isAdmin()
     {
-        if ($this->isGlobalAdmin())
+        if ($this->isGlobalAdmin()) {
             return true;
-        $admins = array_merge($this->getConfig('config.admins', []), $this->getChatConfig('admins', []));
+        }
+        $admins = array_merge($this->getConfig('config.trust', []), $this->getChatConfig('admins', []));
+
         return in_array($this->getUserId(), $admins);
     }
 
@@ -1243,8 +1247,10 @@ class Telebot
     {
         $this->info('[REPLY] %s', $text);
         $target = $this->getTarget($e);
-        if (!$target)
-            return;
+        if (!$target) {
+            return null;
+        }
+
         return $this->sendMessage($target, $text, $format, false, $replyToMessageId, $replyKeyboardMarkup);
     }
 
@@ -1872,7 +1878,7 @@ class Telebot
     }
 
     /**
-     * Add user to Trust list
+     * Add user to Trust list (act as bot admin)
      * @param null $e
      * @global-admin
      * @throws \Exception
@@ -1882,7 +1888,7 @@ class Telebot
         $args = $this->e->getArgs();
         if (!isset($args[1]) || !is_numeric($args[1])) throw new \Exception('Please provide user id');
         $user = $args[1];
-        $this->db->add('config.trust', $user);
+        $this->addConfig('config.trust', $user);
         $this->reply(sprintf($this->__('User %s now in trust list'), $user));
         $this->onUserTrust($user);
     }
@@ -1957,9 +1963,8 @@ class Telebot
         $user = $args[1];
         foreach ($this->getConfig('config.trust', []) as $k => $trustedUser) {
             if ($trustedUser == $user) {
-                unset($this->db['config']['trust'][$k]);
+                $this->deleteConfig('config.trust.' . $k);
                 $this->reply(sprintf($this->__('User %s has been removed from trust list'), $user));
-                $this->db->save();
                 return;
             }
         }
