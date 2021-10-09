@@ -758,7 +758,7 @@ class Telebot
             while ($this->run) {
                 try {
                     $start = microtime(true);
-                    $updates = $bot->getUpdates($this->lastUpdateId, 10, 10);
+                    $updates = $bot->getUpdates($this->lastUpdateId, 10);
                     foreach ($updates as $update) {
                         $this->lastUpdateId = $update->getUpdateId() + 1;
                         $this->handleUpdate($update);
