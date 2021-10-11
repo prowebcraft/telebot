@@ -755,7 +755,7 @@ class Telebot
             }
 
             //Deamon mode
-            while ($this->run) {
+            while ($this->proceedRun()) {
                 try {
                     $start = microtime(true);
                     $updates = $bot->getUpdates($this->lastUpdateId, 10);
@@ -782,10 +782,10 @@ class Telebot
                         }
                     } else {
                         $this->error("Http Telegram Exception while communicating with Telegram API: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
-                        $this->checkErrorsCount();
-                        sleep(5);
                     }
-                } catch (Exception $e) {
+                    sleep(5);
+                    $this->checkErrorsCount();
+                } catch (\Throwable $e) {
                     $this->error("General exception while handling update: %s\nTrace: %s", $e->getMessage(), $e->getTraceAsString());
                     $this->checkErrorsCount();
                 }
@@ -795,6 +795,14 @@ class Telebot
             echo 'This method need to be run under console ' . PHP_EOL;
             exit();
         }
+    }
+
+    /**
+     * Should we proceed bot run
+     */
+    protected function proceedRun(): bool
+    {
+        return $this->run;
     }
 
     /**
