@@ -1082,7 +1082,7 @@ class Telebot
         if (!$replyToId) {
             foreach ($this->matches as $expression => $commandName) {
                 if (preg_match($expression, $command, $matches)) {
-                    if ($this->commandExist($commandName)) {
+                    if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName)) {
                         $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
                         try {
                             call_user_func_array([$this, $commandName], [$matches]);
@@ -1217,13 +1217,13 @@ class Telebot
     }
 
     /**
-     * Check if current user has global admin or chat owner privelleges
+     * Check if current user is owner of bot
      * @return bool
      */
     protected function isGlobalAdmin()
     {
         $userId = $this->getUserId();
-        if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId) {
+        if (!$this->isChatPrivate() && $this->getOwnerId() == $userId) {
             return true;
         }
 
@@ -1231,7 +1231,7 @@ class Telebot
     }
     
     /**
-     * If current user has admin privelleges
+     * If current user has admin privelleges or chat owner privelleges
      * @return bool
      */
     protected function isAdmin()
@@ -1239,9 +1239,13 @@ class Telebot
         if ($this->isGlobalAdmin()) {
             return true;
         }
+        $userId = $this->getUserId();
+        if (!$this->isChatPrivate() && $this->getChatConfig('owner') == $userId) {
+            return true;
+        }
         $admins = array_merge($this->getConfig('config.trust', []), $this->getChatConfig('admins', []));
 
-        return in_array($this->getUserId(), $admins);
+        return in_array($userId, $admins);
     }
 
     /**
