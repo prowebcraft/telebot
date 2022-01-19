@@ -24,6 +24,7 @@ use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
 use TelegramBot\Api\Types\CallbackQuery;
+use TelegramBot\Api\Types\Document;
 use TelegramBot\Api\Types\ForceReply;
 use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
 use TelegramBot\Api\Types\Inline\InlineQuery;
@@ -291,6 +292,10 @@ class Telebot
                 } else if ($message->getContact()) {
                     $this->info('[%s][INFO] Shared contact %s',
                         $chatId, $message->getContact()->toJson(true));
+                } else if ($message->getDocument()) {
+                    $this->info('[%s][INFO] Shared file %s',
+                        $chatId, $message->getDocument()->toJson(true));
+                    $this->onDocumentShare($message->getDocument(), $message);
                 } else {
                     $this->info('[%s][INFO] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -853,6 +858,15 @@ class Telebot
      * @param User $user
      */
     protected function onChatMemberLeft(User $user)
+    {
+
+    }
+
+    /**
+     * Bot has received a document
+     * @param Message $message
+     */
+    protected function onDocumentShare(Document $document, Message $message)
     {
 
     }
