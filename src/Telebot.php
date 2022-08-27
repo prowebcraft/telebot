@@ -133,7 +133,7 @@ class Telebot
     protected function iterate($sleepSeconds = 0)
     {
         if ($sleepSeconds >= 1) {
-            sleep($sleepSeconds);
+            sleep((int)$sleepSeconds);
         } else if (is_numeric($sleepSeconds)) {
             usleep($sleepSeconds * 1000000);
         }

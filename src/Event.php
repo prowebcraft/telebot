@@ -163,7 +163,7 @@ class Event implements \ArrayAccess
      * The return value will be casted to boolean if non-boolean was returned.
      * @since 5.0.0
      */
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return property_exists($this, $offset);
     }
@@ -177,7 +177,7 @@ class Event implements \ArrayAccess
      * @return mixed Can return all value types.
      * @since 5.0.0
      */
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         if(property_exists($this, $offset)) return $this->$offset;
     }
@@ -194,7 +194,7 @@ class Event implements \ArrayAccess
      * @return void
      * @since 5.0.0
      */
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         if(property_exists($this, $offset)) $this->$offset = $value;
     }
@@ -208,7 +208,7 @@ class Event implements \ArrayAccess
      * @return void
      * @since 5.0.0
      */
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         //do nothing
     }
