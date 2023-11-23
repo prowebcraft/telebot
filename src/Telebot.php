@@ -24,6 +24,8 @@ use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
 use TelegramBot\Api\Types\CallbackQuery;
+use TelegramBot\Api\Types\Chat;
+use TelegramBot\Api\Types\ChatMemberUpdated;
 use TelegramBot\Api\Types\Document;
 use TelegramBot\Api\Types\ForceReply;
 use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
@@ -300,6 +302,19 @@ class Telebot
                     $this->info('[%s][INFO] Message with empty body: %s',
                         $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
                 }
+            }
+        } elseif ($botChatMember = $update->getMyChatMember()) {
+            $oldStatus = $botChatMember->getOldChatMember()->getStatus();
+            $newStatus = $botChatMember->getNewChatMember()->getStatus();
+            $this->info('[%s][INFO] Bot %s member status has been changed: %s => %s',
+                $chatId,
+                $this->getChatInfo($botChatMember->getChat()),
+                $oldStatus,
+                $newStatus,
+            );
+            $this->onBotChatMemberStatusChange($botChatMember, $oldStatus, $newStatus);
+            if ($newStatus === 'left') {
+                $this->onBotKick($botChatMember->getChat());
             }
         } else {
             $this->debug('[%s][ERROR] Cannot handle message. Update Info: %s',
@@ -886,6 +901,28 @@ class Telebot
     }
 
     /**
+     * Bot has been kicked from chat
+     * @param Chat $chat
+     * @return void
+     */
+    protected function onBotKick(Chat $chat)
+    {
+
+    }
+
+    /**
+     * Bot chat status has been changed
+     * @param ChatMemberUpdated $botChatMember
+     * @param string $from
+     * Possible values - member / left
+     * @param string $to
+     */
+    protected function onBotChatMemberStatusChange(ChatMemberUpdated $botChatMember, string $from, string $to)
+    {
+
+    }
+
+    /**
      * New Group Chat has been created
      */
     protected function onGroupChatCreated()
@@ -947,6 +984,20 @@ class Telebot
         }
 
         return $fromName;
+    }
+
+    /**
+     * Get chat info as string
+     * @param Chat|null $chat
+     * @return string
+     */
+    public function getChatInfo(Chat $chat = null): string
+    {
+        if (!$chat) {
+            return '?';
+        }
+
+        return sprintf('[%s] %s (%s)', $chat->getId(), $chat->getTitle(), $chat->getType());
     }
 
     /**
