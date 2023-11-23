@@ -759,6 +759,19 @@ class Telebot
                 $this->disableWebhook();
             }
 
+            if (function_exists('pcntl_signal')) {
+                pcntl_async_signals(true);
+                declare(ticks = 1);
+                $closure = function (int $sig) {
+                    $this->info("Terminated by signal " . $sig);
+                    return $this->run = false;
+                };
+                pcntl_signal(SIGHUP,  $closure);
+                pcntl_signal(SIGINT, $closure);
+                pcntl_signal(SIGTERM, $closure);
+                pcntl_signal(SIGUSR1,  $closure);
+            }
+
             //Deamon mode
             while ($this->proceedRun()) {
                 try {
@@ -781,6 +794,7 @@ class Telebot
                         $message = $e->getMessage();
                         if (stripos($message, 'terminated by other getUpdates request') > 0 ) {
                             $this->warning('Conflict: terminated by other getUpdates request; make sure that only one bot instance is running');
+                            $this->run = false;
                         } else {
                             $this->warning('Webhook was set. Switched to console mode');
                             $this->disableWebhook();
@@ -1463,8 +1477,10 @@ class Telebot
      */
     protected function checkErrorsCount()
     {
-        if (++$this->currentErrors >= $this->maxErrors)
+        if (++$this->currentErrors >= $this->maxErrors) {
+            $this->error('Max errors count reached, terminating');
             $this->run = false;
+        }
     }
 
     /**
