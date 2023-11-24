@@ -186,9 +186,10 @@ class Telebot
             $this->setConfig('config.owner', $ownerId);
             $this->deleteConfig('config.globalAdmin');
         }
-        if (!$this->isChannel()) {
-            if (method_exists($this, 'addUser'))
-                call_user_func([$this, 'addUser'], $this->getUserId(), $this->getFromName());
+        if (!$this->isChannel() && $userId = $this->getUserId()) {
+            if (method_exists($this, 'addUser')) {
+                call_user_func([$this, 'addUser'], $userId, $this->getFromName());
+            }
         }
         if ($inlineQuery = $update->getInlineQuery()) {
             $this->info('[%s][OK] Received inline query %s from user %s', $chatId,
@@ -300,7 +301,8 @@ class Telebot
                     $this->onDocumentShare($message->getDocument(), $message);
                 } else {
                     $this->info('[%s][INFO] Message with empty body: %s',
-                        $chatId, json_encode($message, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                        $chatId, $update->toJson(true)
+                    );
                 }
             }
         } elseif ($botChatMember = $update->getMyChatMember()) {
@@ -774,6 +776,8 @@ class Telebot
                 $this->disableWebhook();
             }
 
+            $this->info('Bot is starting in daemon mode');
+
             if (function_exists('pcntl_signal')) {
                 pcntl_async_signals(true);
                 declare(ticks = 1);
@@ -1007,8 +1011,9 @@ class Telebot
     protected function getContext()
     {
         $message = null;
-        if (!$this->update)
+        if (!$this->update) {
             return null;
+        }
         if ($this->update->getInlineQuery()) {
             $message = $this->update->getInlineQuery();
         } else if ($this->update->getCallbackQuery()) {
@@ -1019,8 +1024,29 @@ class Telebot
             $message = $this->update->getEditedMessage();
         } else if ($this->update->getChannelPost()) {
             $message = $this->update->getChannelPost();
+        } else if ($this->update->getMyChatMember()) {
+            $message = $this->update->getMyChatMember();
         }
         return $message;
+    }
+
+    /**
+     * Retrieve message from update context
+     * @param BaseType|null $context
+     * @return Message|null
+     */
+    protected function getMessageFromContext(BaseType $context = null): ?Message
+    {
+        if (!$context && (!$context = $this->getContext())) {
+            return null;
+        }
+        if ($context instanceof Message) {
+            return $context;
+        }
+        if (method_exists($context, 'getMessage')) {
+            return $context->getMessage();
+        }
+        return null;
     }
 
     /**
@@ -1211,15 +1237,11 @@ class Telebot
     protected function getChatType()
     {
         if ($context = $this->getContext()) {
-            if (method_exists($context, 'getMessage')) {
-                return $context->getMessage()->getChat()->getType();
-            } elseif (method_exists($context, 'getChat') && $context->getChat()) {
-                return $context->getChat()->getType();
-            } else {
-                return null;
-            }
+            return $this->getMessageFromContext($context)?->getChat()->getType();
         }
-        if (!$this->e) return null;
+        if (!$this->e) {
+            return null;
+        }
         return $this->e->getMessage()->getChat()->getType();
     }
 
