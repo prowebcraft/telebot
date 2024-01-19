@@ -1198,10 +1198,17 @@ class Telebot
             }
             if ($command && $command[0] == "/") {
                 $command = mb_substr(array_shift($commandParts), 1);
-                if (($atPos = mb_stripos($command, '@'))) $command = mb_substr($command, 0, $atPos);
+                if (($atPos = mb_stripos($command, '@'))) {
+                    $command = mb_substr($command, 0, $atPos);
+                }
+                if (empty($command)) {
+                    return;
+                }
                 $command = $this->toCamel($command);
                 $commandName = $command . 'Command';
-                if (isset($this->commandAlias[$command])) $commandName = $this->commandAlias[$command];
+                if (isset($this->commandAlias[$command])) {
+                    $commandName = $this->commandAlias[$command];
+                }
                 if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName, $userId)) {
                     $this->info('[RUN] Running %s with %s arguments', $commandName, count($commandParts));
                     try {
