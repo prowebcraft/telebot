@@ -1204,7 +1204,10 @@ class Telebot
                 if (empty($command)) {
                     return;
                 }
-                $command = $this->toCamel($command);
+                if (!$command = $this->toCamel($command)) {
+                    $this->warning('Invalid command recieved %s', $replyText);
+                    return;
+                }
                 $commandName = $command . 'Command';
                 if (isset($this->commandAlias[$command])) {
                     $commandName = $this->commandAlias[$command];
@@ -1259,6 +1262,9 @@ class Telebot
         $camel = preg_replace_callback('/(_)([a-z])/', function ($m) {
             return strtoupper($m[2]);
         }, $input);
+        if (empty($camel)) {
+            return false;
+        }
         $camel[0] = strtolower($camel[0]);
         return $camel;
     }
