@@ -137,7 +137,7 @@ class Telebot
         if ($sleepSeconds >= 1) {
             sleep((int)$sleepSeconds);
         } else if (is_numeric($sleepSeconds)) {
-            usleep($sleepSeconds * 1000000);
+            usleep((int)($sleepSeconds * 1000000));
         }
 
         clearstatcache();
