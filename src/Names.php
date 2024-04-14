@@ -142,11 +142,29 @@ trait Names
     {
         if ($name = $this->getUserConfig($id, 'name')) {
             return $name;
-        } elseif ($first = $this->getUserConfig($id, 'info.first_name')) {
-            return $first . (($last = $this->getUserConfig($id, 'info.last_name')) ? ' ' . $last : '');
-        } else {
-            return $default;
         }
+
+        if ($first = $this->getUserConfig($id, 'info.first_name')) {
+            return $first . (($last = $this->getUserConfig($id, 'info.last_name')) ? ' ' . $last : '');
+        }
+
+        return $default;
+    }
+
+    /**
+     * Get Mention Link (html format)
+     * @param $userId
+     * @param string $format
+     * markdown or html format
+     * @return string
+     */
+    protected function getUserMention($userId, $format = 'html')
+    {
+        if ($format === 'markdown') {
+            return sprintf('[%s](tg://user?id=%s)', $this->getUserName($userId), $userId);
+        }
+
+        return sprintf('<a href="tg://user?id=%s">%s</a>', $userId, $this->getUserName($userId));
     }
 
     /**

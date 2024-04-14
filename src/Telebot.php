@@ -23,6 +23,7 @@ use TelegramBot\Api\BaseType;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
 use TelegramBot\Api\HttpException;
+use TelegramBot\Api\InvalidArgumentException;
 use TelegramBot\Api\Types\CallbackQuery;
 use TelegramBot\Api\Types\Chat;
 use TelegramBot\Api\Types\ChatMemberUpdated;
@@ -232,7 +233,7 @@ class Telebot
                     if ($this->getConfig('config.auto_request_access_from_owner')) {
                         $requestMessage = [];
                         $requestMessage[] = $this->__('Request from untrusted user');
-                        $requestMessage[] = $fromName;
+                        $requestMessage[] = $this->getUserMention($this->getUserId());
                         $requestMessage[] = $this->__('Allow access?');
                         $this->sendMessage(
                             $this->getConfig('config.owner'),
@@ -2016,6 +2017,22 @@ class Telebot
         $this->addConfig('config.trust', $user);
         $this->reply(sprintf($this->__('User %s now in trust list'), $user));
         $this->onUserTrust($user);
+    }
+
+    /**
+     * Should protect bot from authorized access
+     * @global-admin
+     * @param bool $protect
+     * @throws \TelegramBot\Api\Exception
+     * @throws InvalidArgumentException
+     */
+    public function protectCommand(bool $protect = true)
+    {
+        $this->setConfig('config.protect', $protect);
+        if ($protect) {
+            $this->setConfig('config.auto_request_access_from_owner', true);
+        }
+        $this->reply(sprintf($this->__('Bot now %s untrusted users to access'), $this->__($protect ? 'disallow' : 'allow')));
     }
 
     /**
