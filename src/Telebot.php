@@ -361,7 +361,9 @@ class Telebot
 
     public function processWebhook(): void
     {
-        $webhook = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'];
+        $uri = $_SERVER['REQUEST_URI'];
+        $webhook = "https://{$host}{$uri}";
         if (!$this->getConfig('webhook_set') || $this->getConfig('webhook') !== $webhook) {
             $this->warning('Setting new webhook - %s', $webhook);
             $this->telegram->setWebhook($webhook);
