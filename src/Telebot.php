@@ -1787,6 +1787,19 @@ class Telebot
     }
 
     /**
+     * Download file content
+     * @param string $fileId
+     * @return false|string
+     * @throws InvalidArgumentException
+     * @throws \TelegramBot\Api\Exception
+     */
+    public function getDocumentContent(Document $document)
+    {
+        $file = $this->telegram->getFile($document->getFileId());
+        return file_get_contents(sprintf('https://api.telegram.org/file/bot%s/%s', $this->botToken, $file->getFilePath()));
+    }
+
+    /**
      * Ask user input
      * @param string $text
      * Question text
