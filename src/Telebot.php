@@ -26,6 +26,7 @@ use TelegramBot\Api\Http\HttpClientInterface;
 use TelegramBot\Api\HttpException;
 use TelegramBot\Api\InvalidArgumentException;
 use TelegramBot\Api\Types\ArrayOfBotCommand;
+use TelegramBot\Api\Types\ArrayOfPhotoSize;
 use TelegramBot\Api\Types\BotCommand;
 use TelegramBot\Api\Types\CallbackQuery;
 use TelegramBot\Api\Types\Chat;
@@ -36,6 +37,7 @@ use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
 use TelegramBot\Api\Types\Inline\InlineQuery;
 use TelegramBot\Api\Types\Inline\QueryResult\AbstractInlineQueryResult;
 use TelegramBot\Api\Types\Message;
+use TelegramBot\Api\Types\PhotoSize;
 use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
 use TelegramBot\Api\Types\Update;
@@ -219,40 +221,20 @@ class Telebot
                 }
             }
         } elseif ((($message = $update->getMessage()) || ($this->isChannel() && ($message = $update->getChannelPost()))) && is_object($message)) {
-            if ($message->getText() || $message->getContact()) {
-                //Check for new channel
-                if ($this->isChannel() && !$this->getConfig('chat.' . $chatId)) {
-                    $this->info('[%s][NEW] New Channel has been revealed %s',
-                        $chatId, $message->getChat()->getTitle());
-                    $this->onChannelCreated();
-                }
-                if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
-                    if (!($this->isChannel() && $this->getConfig('config.skip_channel_messages'))) {
-                        $this->info('[%s][OK] Received message %s from %s',
-                            $chatId, $message->getText(), $fromName);
-                        $this->handle($message);
-                    }
-                } else {
-                    if ($this->getConfig('config.auto_request_access_from_owner')) {
-                        $requestMessage = [];
-                        $requestMessage[] = $this->__('Request from untrusted user');
-                        $requestMessage[] = $this->getUserMention($this->getUserId());
-                        $requestMessage[] = $this->__('Allow access?');
-                        $this->sendMessage(
-                            $this->getConfig('config.owner'),
-                            implode("\n", $requestMessage),
-                            'HTML',
-                            true,
-                            null,
-                            new ReplyKeyboardMarkup([[[
-                                'text' => '/trust ' . $this->getUserId(),
-                            ]]], true, true),
-                        );
-                    }
-                    $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
+            // handle incoming new message
+            if ($this->isChannel() && !$this->getConfig('chat.' . $chatId)) {
+                $this->info('[%s][NEW] New Channel has been revealed %s',
+                    $chatId, $message->getChat()->getTitle());
+                $this->onChannelCreated();
+            }
+            if (!$this->getConfig('config.protect', false) || $this->isMessageAllowed($message)) {
+                if (!($this->isChannel() && $this->getConfig('config.skip_channel_messages'))) {
+                    $this->info('[%s][OK] Received message %s from %s',
                         $chatId, $message->getText(), $fromName);
+                    $this->handle($message);
                 }
-            } else {
+
+                // specific events
                 if ($newMembers = $message->getNewChatMembers()) {
                     /** @var User $member */
                     foreach ($newMembers as $member) {
@@ -303,12 +285,36 @@ class Telebot
                     $this->info('[%s][INFO] Shared file %s',
                         $chatId, $message->getDocument()->toJson(true));
                     $this->onDocumentShare($message->getDocument(), $message);
+                }  else if ($photos = $message->getPhoto()) {
+                    $this->info('[%s][INFO] Shared photo %s', $chatId, json_encode($photos));
+                    $this->onPhotoShare($photos[1], $photos[0], $message);
                 } else {
-                    $this->info('[%s][INFO] Message with empty body: %s',
+                    $this->info('[%s][INFO] Unsopported type of message: %s',
                         $chatId, $update->toJson(true),
                     );
                 }
+
+            } else {
+                if ($this->getConfig('config.auto_request_access_from_owner')) {
+                    $requestMessage = [];
+                    $requestMessage[] = $this->__('Request from untrusted user');
+                    $requestMessage[] = $this->getUserMention($this->getUserId());
+                    $requestMessage[] = $this->__('Allow access?');
+                    $this->sendMessage(
+                        $this->getConfig('config.owner'),
+                        implode("\n", $requestMessage),
+                        'HTML',
+                        true,
+                        null,
+                        new ReplyKeyboardMarkup([[[
+                            'text' => '/trust ' . $this->getUserId(),
+                        ]]], true, true),
+                    );
+                }
+                $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
+                    $chatId, $message->getText(), $fromName);
             }
+
         } elseif ($botChatMember = $update->getMyChatMember()) {
             $oldStatus = $botChatMember->getOldChatMember()->getStatus();
             $newStatus = $botChatMember->getNewChatMember()->getStatus();
@@ -903,6 +909,17 @@ class Telebot
      * @param Message $message
      */
     protected function onDocumentShare(Document $document, Message $message)
+    {
+
+    }
+
+    /**
+     * Bot has received a compressed photo
+     * @param PhotoSize $photo
+     * @param PhotoSize $thumb
+     * @param Message $message
+     */
+    protected function onPhotoShare(PhotoSize $photo, PhotoSize $thumb, Message $message)
     {
 
     }
