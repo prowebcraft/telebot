@@ -22,8 +22,11 @@ use Symfony\Component\Translation\Translator;
 use TelegramBot\Api\BaseType;
 use TelegramBot\Api\BotApi;
 use TelegramBot\Api\Client;
+use TelegramBot\Api\Http\HttpClientInterface;
 use TelegramBot\Api\HttpException;
 use TelegramBot\Api\InvalidArgumentException;
+use TelegramBot\Api\Types\ArrayOfBotCommand;
+use TelegramBot\Api\Types\BotCommand;
 use TelegramBot\Api\Types\CallbackQuery;
 use TelegramBot\Api\Types\Chat;
 use TelegramBot\Api\Types\ChatMemberUpdated;
@@ -50,7 +53,7 @@ class Telebot
     public $cron = [
         'm' => [],
         'h' => [],
-        'd' => []
+        'd' => [],
     ];
     /** @var $telegram BotApi|Client|null */
     public $telegram = null;
@@ -101,7 +104,7 @@ class Telebot
             'appDir' => realpath(dirname(__FILE__) . '/../../../..'),
             'runtimeDir' => null,
             'logFile' => null,
-            'dataFile' => null
+            'dataFile' => null,
         ], $options);
         if ($options['runtimeDir'] === null) {
             $options['runtimeDir'] = $options['appDir'] . DIRECTORY_SEPARATOR . 'runtime';
@@ -242,8 +245,8 @@ class Telebot
                             true,
                             null,
                             new ReplyKeyboardMarkup([[[
-                                'text' => '/trust ' . $this->getUserId()
-                            ]]], true, true)
+                                'text' => '/trust ' . $this->getUserId(),
+                            ]]], true, true),
                         );
                     }
                     $this->info('[%s][SKIP] Skipping message %s from untrusted user %s',
@@ -302,7 +305,7 @@ class Telebot
                     $this->onDocumentShare($message->getDocument(), $message);
                 } else {
                     $this->info('[%s][INFO] Message with empty body: %s',
-                        $chatId, $update->toJson(true)
+                        $chatId, $update->toJson(true),
                     );
                 }
             }
@@ -1099,7 +1102,7 @@ class Telebot
 
         $trustedUsers = array_merge([$this->getConfig('config.globalAdmin', [])],
             $this->getConfig('config.admins', []),
-            $this->getConfig('config.trust', [])
+            $this->getConfig('config.trust', []),
         );
         if (in_array($this->getUserId(), $trustedUsers))
             return true;
@@ -1286,35 +1289,41 @@ class Telebot
      */
     protected function isCommandAllowed($methodName, $user = null, $log = true)
     {
-        if (!$user)
+        if (!$user) {
             $user = $this->getUserId();
+        }
 
         if (!$user) {
-            if ($log)
+            if ($log) {
                 $this->warning('[ACCESS][DENY] Deny Access for command %s - empty user', $methodName);
+            }
             return false;
         }
 
         $method = new ReflectionMethod($this, $methodName);
         $doc = $method->getDocComment();
-        if (strpos($doc, '@global-admin') !== false && !$this->isGlobalAdmin()) {
-            if ($log)
+        if (str_contains($doc, '@global-admin') && !$this->isGlobalAdmin()) {
+            if ($log) {
                 $this->warning('[ACCESS][DENY] Deny Access for command with global admin access level %s', $methodName);
+            }
             return false;
         }
-        if (strpos($doc, '@admin') !== false && !$this->isAdmin()) {
-            if ($log)
+        if (str_contains($doc, '@admin') && !$this->isAdmin()) {
+            if ($log) {
                 $this->warning('[ACCESS][DENY] Deny Access for command with admin access level %s', $methodName);
+            }
             return false;
         }
-        if (strpos($doc, '@private') !== false && !$this->isChatPrivate()) {
-            if ($log)
+        if (str_contains($doc, '@private') && !$this->isChatPrivate()) {
+            if ($log) {
                 $this->warning('[ACCESS][DENY] Deny Access for private-command only %s', $methodName);
+            }
             return false;
         }
         if (in_array($methodName, ['addCron', 'cron', 'run', 'handle', '__construct'])) {
-            if ($log)
+            if ($log) {
                 $this->warning('[ACCESS][DENY] Deny Access for blacklisted command %s', $methodName);
+            }
             return false;
         }
         return true;
@@ -1441,7 +1450,7 @@ class Telebot
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $allowChunks = true
+        $allowChunks = true,
     )
     {
         $size = mb_strlen($message);
@@ -1484,7 +1493,7 @@ class Telebot
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $sendToMyself = false
+        $sendToMyself = false,
     ) {
         if (!$userId = $this->getUserId()) {
             return null;
@@ -1526,7 +1535,7 @@ class Telebot
                 $caption,
                 $replyToMessageId,
                 $replyMarkup,
-                $disableNotification
+                $disableNotification,
             );
         } catch (Exception $e) {
             $this->error('Error sending photo %s - %s', $photo, $e->getMessage());
@@ -1886,7 +1895,7 @@ class Telebot
             'answers' => $answers,
             'multiple' => $multiple,
             'extra' => $extraData,
-            'time' => time()
+            'time' => time(),
         ];
         $chatId = $this->getChatId();
         Dot::setValue($this->asks, "{$chatId}.{$askMessageId}", $payload);
@@ -1987,7 +1996,7 @@ class Telebot
                     'time' => time(),
                     'callback' => $callback,
                     'owner' => $this->getUserId(),
-                    'extra' => $extraData
+                    'extra' => $extraData,
                 ];
                 Dot::setValue($this->inlineAnswers, "{$target}.{$send->getMessageId()}", $payload);
                 $this->saveReplies();
@@ -2129,27 +2138,72 @@ class Telebot
     }
 
     /**
-     * Show list of available commands
+     * List of available commands for current user
+     * @return array
      */
-    public function listCommand()
+    protected function getAvailableCommands(): array
     {
         $class = new ReflectionClass($this);
         $commands = [];
         $userId = $this->getUserId();
-        $commands[] = '<b>' . $this->__('Available commands:') .' </b>';
         foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_FINAL) as $method) {
-            if (strpos($method->name, 'Command') === false)
+            if (!str_contains($method->name, 'Command')) {
                 continue;
+            }
             $doc = $method->getDocComment();
-            if (!$this->isCommandAllowed($method->name, $userId, false))
+            if (str_contains($doc, '@hidden')) {
                 continue;
+            }
+            if (!$this->isCommandAllowed($method->name, $userId, false)) {
+                continue;
+            }
             $botCommand = $this->deCamel(str_replace('Command', '', $method->name));
             $doc = str_replace("\r\n", "\n", $doc);
             $lines = explode("\n", $this->cleanDoc($doc));
             $description = $this->__($lines[0]);
-            $commands[] = sprintf("/%s - <i>%s</i>", $botCommand, $description);
+            $commands[] = [$botCommand, $description];
+        }
+
+        return $commands;
+    }
+
+    /**
+     * Show list of available commands
+     */
+    public function listCommand()
+    {
+        $commands = [
+            '<b>' . $this->__('Available commands:') .' </b>'
+        ];
+        $list = $this->getAvailableCommands();
+        foreach ($list as $command) {
+            $commands[] = sprintf("/%s - <i>%s</i>", $command[0], $command[1]);
         }
         $this->reply(implode("\n", $commands));
+    }
+
+    /**
+     * Update commands for currentUser
+     * @param string $scope
+     * @return HttpClientInterface
+     * @throws HttpException
+     * @throws \TelegramBot\Api\Exception
+     * @throws \TelegramBot\Api\InvalidJsonException
+     */
+    protected function updateCommandsList()
+    {
+        $list = $this->getAvailableCommands();
+        $commands = [];
+        foreach ($list as $item) {
+            $command = new BotCommand();
+            $command->setCommand($item[0]);
+            $command->setDescription($item[1]);
+            $commands[] = $command;
+        }
+        return $this->telegram->setMyCommands(new ArrayOfBotCommand($commands), json_encode([
+            'type' => 'chat',
+            'chat_id' => $this->getChatId(),
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -2264,7 +2318,7 @@ class Telebot
         $this->sendResponse(array_merge([
             'success' => false,
             'error' => $message,
-            'code' => $code
+            'code' => $code,
         ]));
     }
 
@@ -2277,7 +2331,7 @@ class Telebot
         header("Content-Type: application/json; charset=UTF-8", true);
         if (!is_array($result)) $result = [];
         $result = array_merge([
-            'success' => true
+            'success' => true,
         ], $result);
         $response = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         echo $response;

@@ -169,6 +169,7 @@ trait Names
 
     /**
      * Change current user name
+     * @hidden
      */
     public function nameCommand()
     {
