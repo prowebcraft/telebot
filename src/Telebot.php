@@ -1542,18 +1542,38 @@ class Telebot
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $chatId = null)
-    {
+        $chatId = null,
+        $callback = null,
+        $extraData = null,
+    ) {
         try {
-            if ($chatId === null) $chatId = $this->getChatId();
-            return $this->telegram->sendPhoto(
+            if ($chatId === null) {
+                $chatId = $this->getChatId();
+            }
+            if (is_array($replyMarkup)) {
+                $replyMarkup = new InlineKeyboardMarkup($replyMarkup);
+            }
+            $send = $this->telegram->sendPhoto(
                 $chatId,
                 $photo,
                 $caption,
                 $replyToMessageId,
                 $replyMarkup,
                 $disableNotification,
+                'HTML',
             );
+            if ($callback) {
+                $payload = [
+                    'id' => $send->getMessageId(),
+                    'time' => time(),
+                    'callback' => $callback,
+                    'owner' => $this->getUserId(),
+                    'extra' => $extraData,
+                ];
+                Dot::setValue($this->inlineAnswers, "{$chatId}.{$send->getMessageId()}", $payload);
+                $this->saveReplies();
+            }
+            return $send;
         } catch (Exception $e) {
             $this->error('Error sending photo %s - %s', $photo, $e->getMessage());
             return false;
