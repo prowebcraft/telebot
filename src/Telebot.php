@@ -1190,17 +1190,21 @@ class Telebot
                 $this->warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
                 $replyToId = null;
             } else {
-                $callback = $replyData['callback'];
                 if (!$replyData['multiple']) {
                     unset($this->asks[$chatId][$replyToId]);
                     unset($this->asksUsers[$chatId][$userId]);
                     $this->asksAnswers[$chatId] = [];
                     $this->saveReplies();
                 }
-                if (is_string($callback) && method_exists($this, $callback))
-                    $callback = [ $this, $callback ];
-                if (is_callable($callback) || is_array($callback)) {
-                    call_user_func($callback, new Answer($message, $replyData));
+                if ($callback = $replyData['callback']) {
+                    if (is_string($callback) && method_exists($this, $callback)) {
+                        $callback = [ $this, $callback ];
+                    }
+                    if (is_callable($callback) || is_array($callback)) {
+                        call_user_func($callback, new Answer($message, $replyData));
+                    }
+                } else {
+                    $replyToId = null;
                 }
             }
         }
