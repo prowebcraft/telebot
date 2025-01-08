@@ -2227,13 +2227,16 @@ class Telebot
      * @throws \TelegramBot\Api\Exception
      * @throws \TelegramBot\Api\InvalidJsonException
      */
-    protected function updateCommandsList()
+    protected function updateCommandsList(array $filter = [])
     {
         $list = $this->getAvailableCommands();
         $commands = [];
         foreach ($list as $item) {
-            $command = new BotCommand();
             [$botCommand, $description] = $item;
+            if (in_array($botCommand, $filter)) {
+                continue;
+            }
+            $command = new BotCommand();
             $command->setCommand($botCommand);
             $command->setDescription($description ?: $botCommand . ' command');
             $commands[] = $command;

@@ -4,7 +4,7 @@ Add user to Trust list;Добавить пользователя в список
 Add user to Admins list;Добавить пользователя в список администраторов
 Allow bot to recieve messages from all users in this chat;Разрешить прием команд от всех пользователей в этом чате
 Remove user from trust list;Удалить пользователя из списка доверенных
-Show list of available commands;Описание доступных методов
+Show list of available commands;Описание доступных команд
 Change current user name;Смена имени пользователя
 Error running command;Ошибка выполнения команды
 User %s now in trust list;Пользователь %s добавлен в белый список
