@@ -2233,8 +2233,9 @@ class Telebot
         $commands = [];
         foreach ($list as $item) {
             $command = new BotCommand();
-            $command->setCommand($item[0]);
-            $command->setDescription($item[1]);
+            [$botCommand, $description] = $item;
+            $command->setCommand($botCommand);
+            $command->setDescription($description ?: $botCommand . ' command');
             $commands[] = $command;
         }
         return $this->telegram->setMyCommands(new ArrayOfBotCommand($commands), json_encode([
