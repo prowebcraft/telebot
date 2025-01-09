@@ -51,6 +51,10 @@ class Telebot
     const MODE_WEBHOOK = 1;
     const MODE_DEAMON = 2;
 
+    const PARSE_MARKDOWN_V2 = 'MarkdownV2';
+    const PARSE_MARKDOWN_LEGACY = 'Markdown';
+    const PARSE_MARKDOWN_HTML = 'HTML';
+
     public $matches = [];
     public $cron = [
         'm' => [],
@@ -1466,7 +1470,7 @@ class Telebot
     public function sendMessage(
         $to,
         $message,
-        $parse = 'HTML',
+        $parse = self::PARSE_MARKDOWN_HTML,
         $disablePreview = false,
         $replyToMessageId = null,
         $replyMarkup = null,
@@ -1529,16 +1533,28 @@ class Telebot
     }
 
     /**
-     * Use this method to send photos. On success, the sent Message is returned.
+     * Sends a photo to a specified chat via Telegram API.
      *
      * @param \CURLFile|string $photo
-     * @param string|null $caption
+     * The photo to send. Can be a CurlFile, local file path or a file ID.
+     * @param string $caption
+     * Optional caption for the photo. Default is an empty string.
      * @param int|null $replyToMessageId
-     * @param Types\ReplyKeyboardMarkup|Types\ReplyKeyboardHide|Types\ForceReply|null $replyMarkup
+     * Optional message ID to reply to. Default is null.
+     * @param Types\ReplyKeyboardMarkup|Types\ReplyKeyboardHide|Types\ForceReply|array|null $replyMarkup
+     * Optional reply markup (e.g., inline keyboard). Default is null.
      * @param bool $disableNotification
-     * @param int|string $chatId chat_id or @channel_name
-     *
-     * @return \TelegramBot\Api\Types\Message
+     * Whether to send the message silently. Default is false.
+     * @param int|string|null $chatId
+     * The target chat ID. If null, the default chat ID is used.
+     * @param callable|array|null $callback
+     * Optional callback to execute after sending the photo. Default is null.
+     * @param array|null $extraData
+     * Additional data to include in the reply payload. Default is null.
+     * @param string $parseMode
+     * Mode for parsing entities in the caption. Default is 'HTML'. Can be MarkdownV2|HTML|Markdown
+     * @return Message
+     * The result of the sendPhoto request.
      */
     public function sendPhoto(
         $photo,
@@ -1549,6 +1565,7 @@ class Telebot
         $chatId = null,
         $callback = null,
         $extraData = null,
+        $parseMode = self::PARSE_MARKDOWN_HTML,
     ) {
         try {
             if ($chatId === null) {
@@ -1564,7 +1581,7 @@ class Telebot
                 $replyToMessageId,
                 $replyMarkup,
                 $disableNotification,
-                'HTML',
+                $parseMode,
             );
             if ($callback) {
                 $payload = [
