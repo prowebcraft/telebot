@@ -1191,7 +1191,7 @@ class Telebot
             $this->info('[REPLY] Got reply (%s) to message %s - %s', $replyMatch, $replyData['question'], $replyText);
             $replyText = trim($replyText);
             if (!($replyData['contact_request'] && $message->getContact()) && !empty($replyData['answers']) && !$this->inDeepArray($replyData['answers'], $replyText) !== false) {
-                $this->warning('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
+                $this->info('[REPLY] Reply (%s) not in answers list (%s), ignoring message', $replyText, json_encode($replyData['answers'], JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT));
                 $replyToId = null;
             } else {
                 if (!$replyData['multiple']) {
