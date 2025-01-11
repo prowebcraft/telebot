@@ -1150,7 +1150,7 @@ class Telebot
         //Regular Message
         $replyText = $message->getText();
         $command = $replyText;
-        $commandParts = explode(" ", $command);
+        $commandParts = $command ? explode(" ", $command) : [];
         $this->e = $e = new Event();
         $e->setMessage($message);
         $e->setArgs($commandParts);
@@ -1213,17 +1213,19 @@ class Telebot
             }
         }
         if (!$replyToId) {
-            foreach ($this->matches as $expression => $commandName) {
-                if (preg_match($expression, $command, $matches)) {
-                    if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName)) {
-                        $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
-                        try {
-                            call_user_func_array([$this, $commandName], [$matches]);
-                        } catch (\Exception $ex) {
-                            $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
-                            $this->reply($replyMessage);
+            if ($command) {
+                foreach ($this->matches as $expression => $commandName) {
+                    if (preg_match($expression, $command, $matches)) {
+                        if ($this->commandExist($commandName) && $this->isCommandAllowed($commandName)) {
+                            $this->info('[RUN] Running %s matched by %s', $commandName, $expression);
+                            try {
+                                call_user_func_array([$this, $commandName], [$matches]);
+                            } catch (\Exception $ex) {
+                                $replyMessage = $this->__('Error running command') . ': ' . $ex->getMessage();
+                                $this->reply($replyMessage);
+                            }
+                            return;
                         }
-                        return;
                     }
                 }
             }
