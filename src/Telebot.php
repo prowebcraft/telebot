@@ -1602,6 +1602,22 @@ class Telebot
             return false;
         }
     }
+
+    /**
+     * Sends a chat action to indicate the bot is performing a specific action.
+     *
+     * @param string $action The type of action to broadcast. E.g., 'typing', 'upload_photo'.
+     * @param int|null $chatId Optional. The unique identifier for the target chat. If not provided, the current chat ID is used.
+     * @return mixed The result of the action submission or null in case of an error.
+     */
+    public function sendChatAction(string $action, int $chatId = null): bool
+    {
+        try {
+            return $this->telegram->sendChatAction($chatId ?? $this->getChatId(), $action);
+        } catch (Throwable $e) {
+            $this->error('Error sending chat action %s - %s', $action, $e->getMessage());
+        }
+    }
     
     /**
      * Get target user id based on context
