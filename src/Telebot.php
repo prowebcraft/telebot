@@ -40,6 +40,7 @@ use TelegramBot\Api\Types\Message;
 use TelegramBot\Api\Types\PhotoSize;
 use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
+use TelegramBot\Api\Types\ReplyParameters;
 use TelegramBot\Api\Types\Update;
 use TelegramBot\Api\Types\User;
 
@@ -1458,7 +1459,7 @@ class Telebot
      * How telegram will parse your message. Should be html or markdown
      * @param bool $disablePreview
      * Disable preview of links
-     * @param int|null $replyToMessageId
+     * @param ReplyParameters|int|null $replyToMessageId
      * Reply to message
      * @param Types\ReplyKeyboardMarkup|Types\ReplyKeyboardHide|Types\ForceReply|null $replyMarkup
      * Use reply markup
@@ -1474,12 +1475,17 @@ class Telebot
         $message,
         $parse = self::PARSE_MARKDOWN_HTML,
         $disablePreview = false,
-        $replyToMessageId = null,
+        ?int $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
         $allowChunks = true,
-    )
-    {
+        ?ReplyParameters $replyParameters = null,
+    ) {
+        if ($replyToMessageId) {
+            $replyParameters = new ReplyParameters();
+            $replyParameters->setMessageId($replyToMessageId);
+            $replyToMessageId = null;
+        }
         $size = mb_strlen($message);
         if ($size > 4096) {
             if ($allowChunks) {
@@ -1489,7 +1495,7 @@ class Telebot
                 }
                 $last = null;
                 foreach ($chunks as $message) {
-                    $last = $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
+                    $last = $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification, replyParameters: $replyParameters);
                     $this->info('Send chunk %s: %s', $message, $last->toJson());
                 }
                 return $last;
@@ -1497,7 +1503,8 @@ class Telebot
                 $message = mb_substr($message, 0, 4096);
             }
         }
-        return $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification);
+        
+        return $this->telegram->sendMessage($to, $message, $parse, $disablePreview, $replyToMessageId, $replyMarkup, $disableNotification, replyParameters: $replyParameters);
     }
 
     /**
@@ -1902,8 +1909,17 @@ class Telebot
      * Some extra data to pass with payload
      * @return Message
      */
-    public function ask($text, $answers = null, $callback = null, $multiple = false, $useReplyMarkup = false, $extraData = [], $replyToMessageId = null, $selective = false)
-    {
+    public function ask(
+        $text,
+        $answers = null,
+        $callback = null,
+        $multiple = false,
+        $useReplyMarkup = false,
+        $extraData = [],
+        ?int $replyToMessageId = null,
+        $selective = false,
+        ?ReplyParameters $replyParameters = null,
+    ) {
         $this->info('[ASK] %s', $text . (!empty($answers) ? ' with answers: ' . var_export($answers, true) : ''));
         $e = $this->e;
         if ($answers instanceof ReplyKeyboardMarkup) {
