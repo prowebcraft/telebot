@@ -293,12 +293,11 @@ class Telebot
                 }  else if ($photos = $message->getPhoto()) {
                     $this->info('[%s][INFO] Shared photo %s', $chatId, json_encode($photos));
                     $this->onPhotoShare($photos[1], $photos[0], $message);
-                } else {
+                } elseif (!$message->getText()) {
                     $this->info('[%s][INFO] Unsopported type of message: %s',
                         $chatId, $update->toJson(true),
                     );
                 }
-
             } else {
                 if ($this->getConfig('config.auto_request_access_from_owner')) {
                     $requestMessage = [];
