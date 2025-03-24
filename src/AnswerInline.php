@@ -35,7 +35,14 @@ class AnswerInline
      */
     public function reply($text = null, $showAlert = false)
     {
-        return $this->bot->telegram->answerCallbackQuery($this->getCallbackQuery()->getId(), $text, $showAlert);
+        try {
+            return $this->bot->telegram->answerCallbackQuery($this->getCallbackQuery()?->getId(), $text, $showAlert);
+        } catch (\Throwable $e) {
+            if (!str_contains($e->getMessage(), 'query is too old')) {
+                throw $e;
+            }
+        }
+        return false;
     }
 
     /**
