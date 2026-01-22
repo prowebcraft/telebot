@@ -1527,8 +1527,11 @@ class Telebot
         $replyMarkup = null,
         $disableNotification = false,
         $sendToMyself = false,
+        $systemCall = false
     ) {
-        if (!$userId = $this->getUserId()) {
+        if ($systemCall) {
+            $userId = -1;
+        } else if (!$userId = $this->getUserId()) {
             return null;
         }
         if (!$ownerId = $this->getOwnerId()) {
