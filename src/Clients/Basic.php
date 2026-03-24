@@ -32,13 +32,8 @@ class Basic extends BotApi
     {
         $this->proxy = $proxy;
         parent::__construct($token, $trackerToken);
+        if ($proxy) {
+            $this->setProxy($proxy);
+        }
     }
-
-    public function getUrl()
-    {
-        if ($this->proxy)
-            return $this->proxy . $this->token;
-        return parent::getUrl();
-    }
-
 }
